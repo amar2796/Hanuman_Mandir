@@ -195,7 +195,7 @@
         }).catch(function() {});
       }
 
-      /* ══ Household Finances JS — DISABLED
+      /* ══ TEMPLE FINANCES JS — DISABLED
          To re-enable: remove the opening slash-star and closing star-slash
          around this entire block (match with CSS and HTML blocks above).
 
@@ -335,7 +335,7 @@ var _trLoaded = false;
    }
  }
  document.addEventListener("DOMContentLoaded", _watchTransparency);
- ══ END Household Finances JS ══ */
+ ══ END TEMPLE FINANCES JS ══ */
 
       function _checkStatsVisible() {
         if (_statsAnimated) return;
@@ -383,32 +383,101 @@ var _trLoaded = false;
           var badge = document.getElementById("annBadge");
           if (data.Badge) { badge.textContent = data.Badge; badge.style.display = "inline-block"; }
           if (data.Icon) document.querySelector(".ann-icon").textContent = data.Icon;
-
-          var banner = document.getElementById("announcementBanner");
-          banner.classList.add("open");
-          // Start collapsed, then transition open — mirrors dismissBanner's close animation
-          // so the header eases into place instead of snapping down instantly.
-          banner.style.maxHeight = "0";
-          banner.style.opacity = "0";
-          banner.style.overflow = "hidden";
-          void banner.offsetHeight; // force reflow so the collapsed state registers first
-          var targetHeight = banner.scrollHeight;
-          banner.style.transition = "max-height 0.4s ease, opacity 0.35s ease";
-          banner.style.maxHeight = targetHeight + "px";
-          banner.style.opacity = "1";
+          document.getElementById("announcementBanner").classList.add("open");
           _syncSiteTopHeight();
-          setTimeout(function(){
-            banner.style.maxHeight = "";
-            banner.style.overflow = "";
-            banner.style.transition = "";
-            _syncSiteTopHeight();
-          }, 420);
         }).catch(function(){});
       }
       document.addEventListener("DOMContentLoaded", function(){ setTimeout(loadAnnouncement, 600); });
       document.addEventListener("DOMContentLoaded", function(){ _syncSiteTopHeight(); });
       window.addEventListener("resize", _syncSiteTopHeight);
       document.addEventListener("DOMContentLoaded", loadGallery);
+
+/* ── Members Slider ── */
+      /* ── Members Slider ── */
+      var _memberIdx = 0;
+      var _memberTotal = 3;
+      var _memberAutoplay = null;
+      var _memberAutoplayDelay = 4000;
+
+      function memberGoTo(idx) {
+        var cards = document.querySelectorAll('.member-card');
+        var dots = document.querySelectorAll('.member-dot');
+        var currentCard = cards[_memberIdx];
+        // Add slide-out, then switch
+        currentCard.classList.add('slide-out');
+        setTimeout(function() {
+          currentCard.classList.remove('active');
+          currentCard.classList.remove('slide-out');
+          currentCard.style.display = '';
+          dots[_memberIdx].classList.remove('active');
+          _memberIdx = (idx + _memberTotal) % _memberTotal;
+          cards[_memberIdx].classList.add('active');
+          dots[_memberIdx].classList.add('active');
+        }, 300);
+      }
+      function memberNav(dir) { memberGoTo(_memberIdx + dir); }
+      function resetMemberAutoplay() {
+        clearInterval(_memberAutoplay);
+        _memberAutoplay = setInterval(function(){ memberNav(1); }, _memberAutoplayDelay);
+      }
+      // Start autoplay after page load
+      document.addEventListener('DOMContentLoaded', function() {
+        setTimeout(function() {
+          _memberAutoplay = setInterval(function(){ memberNav(1); }, _memberAutoplayDelay);
+        }, 2500);
+      });
+
+      /* Splash */
+      window.addEventListener("load", () => {
+        setTimeout(() => {
+          const splash = document.getElementById("splash-screen");
+          splash.classList.add("splash-hidden");
+          // Start music when animation starts (when splash begins to hide)
+          if (!isPlaying) {
+            music
+              .play()
+              .then(() => {
+                isPlaying = true;
+                audioBtn.innerHTML = '<i class="fa-solid fa-volume-high"></i>';
+              })
+              .catch(() => {
+                // Autoplay blocked — will play on first user interaction
+              });
+          }
+          setTimeout(() => {
+            splash.style.display = "none";
+          }, 800);
+        }, 1500);
+      });
+
+      /* Audio */
+      let music = document.getElementById("bgMusic");
+      let audioBtn = document.getElementById("audioControl");
+      let isPlaying = false;
+      music.volume = 0.5;
+      function toggleAudio() {
+        if (isPlaying) {
+          music.pause();
+          audioBtn.innerHTML = '<i class="fa-solid fa-volume-xmark"></i>';
+          isPlaying = false;
+        } else {
+          music.play().catch(() => {});
+          audioBtn.innerHTML = '<i class="fa-solid fa-volume-high"></i>';
+          isPlaying = true;
+        }
+      }
+      audioBtn.addEventListener("click", toggleAudio);
+      // Fallback: if autoplay was blocked, start on first user interaction
+      function initialPlay() {
+        if (!isPlaying) toggleAudio();
+        document.removeEventListener("click", initialPlay);
+        document.removeEventListener("touchstart", initialPlay);
+      }
+      document.addEventListener("click", initialPlay);
+      document.addEventListener("touchstart", initialPlay);
+      setTimeout(() => {
+        if (isPlaying) toggleAudio();
+      }, 12000);
 
       /* Hamburger nav menu toggle */
       function toggleNavMenu() {
@@ -447,6 +516,32 @@ var _trLoaded = false;
       }
       window.addEventListener("scroll", reveal);
       reveal();
+
+      /* Floating Ram */
+      function createFloatingRam() {
+        const heroSection = document.querySelector(".hero");
+        if (!heroSection) return;
+        const ramElement = document.createElement("div");
+        ramElement.classList.add("floating-ram");
+        ramElement.innerText = "राम";
+        const randomLeft = Math.random() * 100;
+        const randomSize = Math.random() * 1.5 + 1;
+        const heroHeight = heroSection.offsetHeight;
+        const travelDistance = heroHeight + 100;
+        const randomSpeed = Math.random() * 20 + 30;
+        const duration = travelDistance / randomSpeed;
+        ramElement.style.left = randomLeft + "%";
+        ramElement.style.setProperty("--travel", `-${travelDistance}px`);
+        ramElement.style.animationDuration = duration + "s";
+        ramElement.style.fontSize = randomSize + "rem";
+        heroSection.appendChild(ramElement);
+        setTimeout(() => {
+          ramElement.remove();
+        }, duration * 1000);
+      }
+      setTimeout(() => {
+        setInterval(createFloatingRam, 900);
+      }, 2000);
 
       /* ── Input validation helpers ── */
       function _fbSetError(id, msg) {
@@ -525,51 +620,11 @@ var _trLoaded = false;
         var btn = document.querySelector('.feedback-submit-btn');
         if (btn) btn.classList.add('loading');
 
-        function _fbShowThanks() {
-          // Mark fields as OK
-          _fbClearError('fb_name'); _fbClearError('fb_mobile'); _fbClearError('fb_message');
-
-          // Show thank you message
-          const thanksEl = document.getElementById("feedbackThanks");
-          thanksEl.style.display = "block";
-          thanksEl.scrollIntoView({ behavior: "smooth", block: "center" });
-
-          // Auto-hide after 6 seconds and clear form
-          setTimeout(() => {
-            thanksEl.style.opacity = "0";
-            thanksEl.style.transition = "opacity 0.5s ease";
-            setTimeout(() => {
-              thanksEl.style.display = "none";
-              thanksEl.style.opacity = "";
-              thanksEl.style.transition = "";
-              document.getElementById("fb_name").value = "";
-              document.getElementById("fb_mobile").value = "";
-              document.getElementById("fb_address").value = "";
-              document.getElementById("fb_message").value = "";
-              _fbClearAll();
-            }, 500);
-          }, 6000);
-        }
-
-        function _fbShowError(msg) {
-          var box = document.getElementById("fbSubmitError");
-          if (!box) {
-            box = document.createElement("div");
-            box.id = "fbSubmitError";
-            box.style.cssText = "margin-top:14px;padding:12px 16px;border-radius:10px;" +
-              "background:rgba(231,76,60,0.08);border:1.5px solid rgba(231,76,60,0.35);" +
-              "color:#c0392b;font-size:0.85rem;line-height:1.5;text-align:center;";
-            var formBox = document.getElementById("feedbackFormBox");
-            if (formBox) formBox.appendChild(box);
-          }
-          box.textContent = msg || "Something went wrong sending your feedback. Please check your connection and try again.";
-          box.style.display = "block";
-        }
-
-        // Send feedback via postData to backend (stored as audit/feedback log).
-        // The thank-you state (and form clear) now only fires once the backend
-        // actually confirms — previously it showed unconditionally even if the
-        // request failed, silently swallowed via .catch(() => {}).
+        // Send feedback via postData to backend (stored as audit/feedback log)
+        const feedbackNote = `FEEDBACK | Name: ${name} | Mobile: ${mobile} | Address: ${
+          address || "—"
+        } | Message: ${message}`;
+        // Try to send (best-effort, non-blocking)
         if (typeof postData === "function") {
           postData({
             action: "submitFeedback",
@@ -579,23 +634,35 @@ var _trLoaded = false;
             Message: message,
             Status: "Pending",
             SubmittedAt: new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }),
-          }).then(function(res) {
-            if (btn) btn.classList.remove('loading');
-            if (res && res.status === "error") {
-              _fbShowError(res.message || undefined);
-            } else {
-              _fbShowThanks();
-            }
-          }).catch(function() {
-            if (btn) btn.classList.remove('loading');
-            _fbShowError();
-          });
-        } else {
-          // No backend function available on this page — can't confirm delivery,
-          // so don't claim success.
-          if (btn) btn.classList.remove('loading');
-          _fbShowError("Feedback couldn't be sent right now. Please try again shortly.");
+          }).catch(() => {}); // best-effort
         }
+
+        // Remove loading state
+        if (btn) btn.classList.remove('loading');
+
+        // Mark fields as OK
+        _fbClearError('fb_name'); _fbClearError('fb_mobile'); _fbClearError('fb_message');
+
+        // Show thank you message
+        const thanksEl = document.getElementById("feedbackThanks");
+        thanksEl.style.display = "block";
+        thanksEl.scrollIntoView({ behavior: "smooth", block: "center" });
+
+        // Auto-hide after 6 seconds and clear form
+        setTimeout(() => {
+          thanksEl.style.opacity = "0";
+          thanksEl.style.transition = "opacity 0.5s ease";
+          setTimeout(() => {
+            thanksEl.style.display = "none";
+            thanksEl.style.opacity = "";
+            thanksEl.style.transition = "";
+            document.getElementById("fb_name").value = "";
+            document.getElementById("fb_mobile").value = "";
+            document.getElementById("fb_address").value = "";
+            document.getElementById("fb_message").value = "";
+            _fbClearAll();
+          }, 500);
+        }, 6000);
       }
 
 /* ── Payment Modal ── */
@@ -714,7 +781,7 @@ var _trLoaded = false;
 
       /* ── Floating divine particles ── */
       var _payParticleInterval = null;
-      var _payParticles = ['🏠','✨','🔧','💰','⭐','🌟','👍'];
+      var _payParticles = ['🪔','✨','🌸','🔱','ॐ','🌼','🙏'];
       function spawnPayParticles() {
         _payParticleInterval = setInterval(function() {
           var modal = document.getElementById('payModal');
@@ -770,13 +837,13 @@ var _trLoaded = false;
         }).catch(function() {});
       }
 
-/* ══ HOME TIPS TICKER ══
+/* ══ CHAUPAI TICKER ══
    Moved here from inline <script> in index.html.
    Runs on DOMContentLoaded — requires #chaupaiDisplay and #chaupaiSpacer in DOM. */
 (function _initChaupai() {
   var chaupais = [
-    'हर महीने की पहली तारीख को घर के खर्चों का हिसाब जरूर देखें।',
-    'समय पर योगदान देने से घर की व्यवस्था सुचारु रहती है।'
+    'प्रबिसि नगर कीजे सब काजा। हृदयँ राखि कोसलपुर राजा॥',
+    'मंगल भवन अमंगल हारी। द्रवहु सुदसरथ अजर बिहारी।।'
   ];
 
   function init() {

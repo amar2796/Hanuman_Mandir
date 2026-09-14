@@ -350,7 +350,7 @@
             <div>Home Assistant</div>
             <div>Online · <span id="_mbotTagline">Jai Shree Ram</span></div>
           </div>
-          <button class="mbot-hbtn" id="_mbotLangBtn" onclick="_mbotToggleLang()">EN</button>
+          <button class="mbot-hbtn" id="_mbotLangBtn" onclick="_mbotToggleLang()">HI</button>
           <button class="mbot-hbtn" onclick="_mbotClose()" style="padding:4px 9px;font-size:14px;">×</button>
         </div>
         <div id="_mbotMsgs"></div>
@@ -659,7 +659,7 @@
     /* ══════════════ LANGUAGE TOGGLE ══════════════ */
     window._mbotToggleLang = function () {
       _botLang = _botLang === "en" ? "hi" : "en";
-      document.getElementById("_mbotLangBtn").textContent = _bi("EN", "HI");
+      document.getElementById("_mbotLangBtn").textContent = _bi("HI", "EN");
       // Clear and restart
       document.getElementById("_mbotMsgs").innerHTML = "";
       _addBotMsg(_t("welcome") || (window.APP && APP.tagline ? APP.tagline + "!" : "Welcome!"));
