@@ -31,7 +31,7 @@
       /* ── VERSION ───────────────────────────────────────────────────────
          Shown in admin sidebar footer and login page version label.
          ✔ SYNC with CFG.version in appscript.txt whenever you update. */
-      version: "2.2.0",
+      version: "4.0.0",
     
     
       /* ── IDENTITY ──────────────────────────────────────────────────────
@@ -68,7 +68,7 @@
          These are NOT synced to appscript — frontend-only. */
       phone:   "+918127991402",
       email:   "hanumanmandirpaliya@gmail.com",
-      website: "https://amar2796.github.io/Mandir_Contribution_System/",
+      website: "https://amar2796.github.io/Hanuman_Mandir/",
     
     
       /* ── HOMEPAGE DISPLAY ──────────────────────────────────────────────
@@ -115,7 +115,7 @@
          currency            : Currency symbol shown on receipts and UI.
          currencyCode        : ISO 4217 currency code (informational).
          ✔ SYNC receiptPrefix and legacyReceiptPrefix with appscript CFG. */
-      receiptPrefix:       "MNR",
+       receiptPrefix:       "MNR",
       legacyReceiptPrefix: "TRX",
       currency:     "₹",          // Symbol used in HTML/UI display
       currencyText: "Rs.",         // Text form used in jsPDF (Helvetica can't render ₹). SYNC with CFG.currencyText in appscript.txt
@@ -170,7 +170,6 @@
          Leave blank ("") to hide the map iframe entirely. */
       mapEmbedUrl: "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3273.497389457402!2d82.20519597492734!3d26.321060585267084!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x399a790bd4e8dff3%3A0x93c61c2049ae55f2!2sHanuman%20Mandir!5e1!3m2!1sen!2sin!4v1775203315104!5m2!1sen!2sin",
     
-    
       /* ── GOOGLE DRIVE FOLDER IDs ───────────────────────────────────────
          IDs of Drive folders where uploaded files are stored.
          Create sub-folders in your Drive, paste the folder IDs here.
@@ -184,5 +183,17 @@
       folderExpense: "1YY55xNxs5_LNCNjYYkq0oeEzoZBg5qKv",  // Drive > ExpenseReceipts/
       folderGallery: "1ecYdcFZrSF2mKX15mDYh8vi4Oat9jF2n",  // Drive > GalleryPhotos/
       folderSlip:    "1c60FzCP3ECU_XBckWfBVkcWyNb-ikNIk",   // Drive > PaymentSlips/
+    
+    
+      /* ── BIRTHDAY WISH — FIXED REPLIES ──────────────────────────────────
+         One-tap reply messages shown to other active members when someone
+         has a birthday today (bell notification). Edit freely — no code
+         changes needed elsewhere; the bell reads this list directly. */
+       birthdayWishes: [
+        "🎉 Happy Birthday!",
+        "🎂 Wishing you a wonderful year ahead!",
+        "🙏 Many happy returns of the day!",
+        "🌸 Have a blessed birthday!"
+      ],
     
     };

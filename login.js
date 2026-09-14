@@ -22,7 +22,12 @@ function clearRememberToken(){try{localStorage.removeItem(_RMK);}catch(e){}}
     // Then check remember-me token
     const t=loadRememberToken();
     if(t&&(t.role==="Admin"||t.role==="User")){
-      localStorage.setItem("session",JSON.stringify({userId:t.userId,name:t.name,role:t.role,email:t.email||"",sessionToken:t.sessionToken||"",expiry:Date.now()+30*60*1000}));
+      // [FIX-24H] Previously hardcoded expiry:Date.now()+30*60*1000 here, which
+      // silently capped a 24h remember-me session down to 30 min on every page
+      // load — even though the remember token itself (t.expiry) is still valid
+      // for up to 24h. Reuse t.expiry directly so the client-side session
+      // window matches what "remember me" actually promised.
+      localStorage.setItem("session",JSON.stringify({userId:t.userId,name:t.name,role:t.role,email:t.email||"",sessionToken:t.sessionToken||"",expiry:t.expiry,ttlMs:24*60*60*1000}));
       location.replace(t.role==="Admin"?"admin.html":"user.html");
     }
   }catch(e){}
@@ -67,7 +72,17 @@ async function sha256(str){
   return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,"0")).join("");
 }
 
-// ── JSONP getData/postData (login.html has its own copy — no app.js dependency)
+// ── getData/postData (login.html has its own copy — no app.js dependency)
+// NOTE: Both getData() and postData() are JSONP calls implemented via a
+// dynamically-created <script src="..."> tag — this is a GET request under
+// the hood in both cases, regardless of the "postData" name. There is no
+// real HTTP POST anywhere in this file. Every field passed to postData(),
+// including OTPs and password hashes, is serialized into the URL query
+// string via URLSearchParams. This is a known constraint of talking to a
+// Google Apps Script backend via JSONP (works around Apps Script's CORS
+// limitations for true cross-origin POST), but it does mean sensitive
+// values can end up in browser history and any server/proxy access logs
+// — do not assume anything sent through postData() stays out of the URL.
 let _cbId=0;
 function getData(action){
   return new Promise((resolve,reject)=>{
@@ -90,25 +105,38 @@ function postData(data){
   });
 }
 
-function setSessionTokenOnServer(userId,token){
-  // Returns a Promise that resolves when the token is confirmed written (or after timeout/error).
-  // This allows doLogin() to await it before redirecting, preventing SESSION_TOKEN_MISMATCH
-  // and VERIFY_SESSION_ERROR caused by the page loading before the token hits the server.
+function setSessionTokenOnServer(userId,token,rememberMe,sessionTicket){
+  // Returns a Promise<boolean> — true only when the server CONFIRMS the token was written.
+  // [BUG FIX] Previously always resolved (never told the caller whether the write actually
+  // succeeded), so doLogin() persisted "session" to localStorage and redirected regardless.
+  // If a hard refresh, tab close, or network hiccup interrupted this call mid-flight, the
+  // browser ended up holding a "logged in" session pointing at a token the server never
+  // actually stored. Every subsequent page load then failed to load data and eventually
+  // showed "Session expired", and that broken state persisted across further refreshes
+  // until the local 30-min timer ran out. Now the caller only persists+redirects on true.
+  // [FIX-24H] rememberMe wasn't previously sent to the server at all, so setSessionToken
+  // always granted a 30-min server-side window regardless of the checkbox — the audit
+  // log showed SESSION_EXPIRED at 30 min even when "remember me" was checked.
   return new Promise(function(resolve){
     function _attempt(n){
       try{
         const cb="cb_sst_"+Date.now()+"_"+n;
         const s=document.createElement("script");let done=false;
-        window[cb]=function(){if(done)return;done=true;try{delete window[cb];s.remove();}catch(e){}resolve();};
+        window[cb]=function(res){
+          if(done)return;done=true;try{delete window[cb];s.remove();}catch(e){}
+          const ok = !!(res && res.status !== "error");
+          if(!ok){ try{console.warn("setSessionToken:",res&&res.message||"rejected");}catch(e){} }
+          resolve(ok);
+        };
         s.onerror=function(){
           if(done)return;done=true;try{delete window[cb];s.remove();}catch(e){};
-          if(n===1){setTimeout(()=>_attempt(2),2000);}else{resolve();} // resolve after retry so we don't block forever
+          if(n===1){setTimeout(()=>_attempt(2),2000);}else{resolve(false);} // out of retries — report failure
         };
-        s.src=API_URL+"?action=setSessionToken&userId="+encodeURIComponent(userId)+"&token="+encodeURIComponent(token)+"&callback="+cb;
+        s.src=API_URL+"?action=setSessionToken&userId="+encodeURIComponent(userId)+"&token="+encodeURIComponent(token)+"&rememberMe="+(rememberMe?"1":"0")+"&sessionTicket="+encodeURIComponent(sessionTicket||"")+"&callback="+cb;
         document.body.appendChild(s);
-        // Timeout safety: resolve after 5s max so redirect is never stuck
-        setTimeout(()=>{if(!done){done=true;try{delete window[cb];s.remove();}catch(e){}}resolve();},5000);
-      }catch(e){resolve();}
+        // Timeout safety: report failure after 5s max so the caller is never stuck waiting.
+        setTimeout(()=>{if(!done){done=true;try{delete window[cb];s.remove();}catch(e){}resolve(false);}},5000);
+      }catch(e){resolve(false);}
     }
     _attempt(1);
   });
@@ -176,6 +204,34 @@ function _loginSuccess(){_LR.clear();}
 // ══════════════════════════════════════════════════════════════════
 //  LOGIN
 // ══════════════════════════════════════════════════════════════════
+// [MERGE-LOGIN] Single JSONP call that does credential check + session-token
+// write together. `n` is the attempt number (1 = first try, 2 = one retry).
+// Retrying is safe here: same mobile/password/token sent again just re-verifies
+// and re-writes the same token — same end state, no duplicate side effects.
+function _attemptLogin(mobile,hashedPwd,sessionToken,rememberMeChecked,n){
+  return new Promise((resolve,reject)=>{
+    const cbName="handleLogin_"+Date.now()+"_"+n;const s=document.createElement("script");let done=false;
+    window[cbName]=function(r){if(done)return;done=true;clearTimeout(timer);delete window[cbName];s.remove();resolve(r);};
+    // 20s (was 15s) — this single call now also does the session-token write
+    // that used to be a separate call, so it needs a little more headroom.
+    const timer=setTimeout(()=>{
+      if(done)return;done=true;delete window[cbName];s.remove();
+      if(n===1){
+        // One silent retry, same generated token — same pattern app.js uses
+        // for postData(), and safe for the same reason (idempotent).
+        _attemptLogin(mobile,hashedPwd,sessionToken,rememberMeChecked,2).then(resolve).catch(reject);
+      } else {
+        reject(new Error("Request timed out."));
+      }
+    },20000);
+    s.onerror=function(){if(done)return;done=true;clearTimeout(timer);delete window[cbName];s.remove();reject(new Error("Network error."));};
+    s.src=API_URL+"?action=login&mobile="+encodeURIComponent(mobile)+"&password="+hashedPwd+
+      "&token="+encodeURIComponent(sessionToken)+"&rememberMe="+(rememberMeChecked?"1":"0")+
+      "&callback="+cbName;
+    document.body.appendChild(s);
+  });
+}
+
 async function doLogin(){
   document.getElementById("retryBtn").style.display="none";
   if(!_loginGuard())return;
@@ -187,20 +243,38 @@ async function doLogin(){
   setMsg("loginMsg","","");
   try{
     const hashedPwd=await sha256(password);
-    const res=await new Promise((resolve,reject)=>{
-      const cbName="handleLogin_"+Date.now();const s=document.createElement("script");let done=false;
-      window[cbName]=function(r){if(done)return;done=true;clearTimeout(timer);delete window[cbName];s.remove();resolve(r);};
-      const timer=setTimeout(()=>{if(done)return;done=true;delete window[cbName];s.remove();reject(new Error("Request timed out."));},15000);
-      s.onerror=function(){if(done)return;done=true;clearTimeout(timer);delete window[cbName];s.remove();reject(new Error("Network error."));};
-      s.src=API_URL+"?action=login&mobile="+encodeURIComponent(mobile)+"&password="+hashedPwd+"&callback="+cbName;
-      document.body.appendChild(s);
-    });
+    // [FIX-24H] previously generated AFTER the login response came back — moved
+    // up so it can be sent WITH the login request itself (merged call). Just a
+    // random value, safe to generate before we know the outcome.
+    const sessionToken=Array.from(crypto.getRandomValues(new Uint8Array(32))).map(b=>b.toString(16).padStart(2,"0")).join("");
+    const rememberMeChecked=document.getElementById("rememberMe").checked;
+    const res=await _attemptLogin(mobile,hashedPwd,sessionToken,rememberMeChecked,1);
     if(res.status==="success"){
       const user=res.user;delete user.Password;
-      const sessionToken=Array.from(crypto.getRandomValues(new Uint8Array(32))).map(b=>b.toString(16).padStart(2,"0")).join("");
-      const sessionData={userId:user.UserId,name:user.Name,role:user.Role,email:user.Email||"",photoURL:user.PhotoURL||"",expiry:Date.now()+30*60*1000,sessionToken};
+      // [FIX-24H] previously hardcoded expiry:Date.now()+30*60*1000 here regardless
+      // of the "remember me" checkbox — the client-side session window (used by
+      // _checkAdminSession's page-gating) was capped at 30 min even when the box
+      // was checked. Now matches the same window granted server-side.
+      const clientTtlMs=rememberMeChecked?24*60*60*1000:30*60*1000;
+      // [MERGE-LOGIN] res.sessionSet===true means the backend already stored the
+      // token inline (new merged path) — nothing further to confirm. Only if the
+      // backend hasn't been redeployed yet (older Apps Script still returning
+      // sessionTicket, no sessionSet) do we fall back to the original separate
+      // setSessionToken call, so login keeps working through a rolling deploy.
+      let _tokenWritten = !!res.sessionSet;
+      if(!_tokenWritten && res.sessionTicket){
+        setMsg("loginMsg","Signing in...","success");
+        _tokenWritten = await setSessionTokenOnServer(String(user.UserId),sessionToken,rememberMeChecked,res.sessionTicket);
+      }
+      if(!_tokenWritten){
+        setMsg("loginMsg","❌ Could not complete sign-in — please try again.","error");
+        const retryBtn=document.getElementById("retryBtn");
+        if(retryBtn){retryBtn.style.display="block";retryBtn.innerHTML='<i class="fa-solid fa-rotate-right"></i> Retry Login';}
+        return; // nothing was persisted — a retry/hard-refresh here just re-shows the login form
+      }
+      const sessionData={userId:user.UserId,name:user.Name,role:user.Role,email:user.Email||"",photoURL:user.PhotoURL||"",expiry:Date.now()+clientTtlMs,sessionToken,ttlMs:clientTtlMs};
       localStorage.setItem("session",JSON.stringify(sessionData));
-      if(document.getElementById("rememberMe").checked){
+      if(rememberMeChecked){
         saveRememberToken(user.UserId,user.Name,user.Role,user.Email||"",sessionToken);
       }
       try{const bc=new BroadcastChannel("mandir_session");bc.postMessage({type:"SESSION_REVOKED",userId:String(user.UserId)});setTimeout(()=>bc.close(),500);}catch(e){}
@@ -223,14 +297,9 @@ async function doLogin(){
       const lastLoginStr = res.lastLogin ? " · Last login: "+_fmtLastLogin(res.lastLogin) : "";
       setMsg("loginMsg","✓ Login successful! Redirecting..."+lastLoginStr,"success");
       _loginSuccess();
-      // FIX: Await token write BEFORE redirecting. This prevents SESSION_TOKEN_MISMATCH
-      // and VERIFY_SESSION_ERROR that occurred when admin.html loaded and called getAllData/
-      // getEmailQuota before the new sessionToken was persisted on the server.
-      setSessionTokenOnServer(String(user.UserId),sessionToken).then(function(){
-        location.href=user.Role==="Admin"?"admin.html":"user.html";
-      });
+      location.href=user.Role==="Admin"?"admin.html":"user.html";
     }else if(res.status==="pending"){
-      setMsg("loginMsg","Your account is awaiting approval. You'll receive an email once the temple admin reviews your request.","pending");
+      setMsg("loginMsg","Your account is awaiting approval. You'll receive an email once the household admin reviews your request.","pending");
     }else if(res.status==="error"){
       // Use server's errorCode to highlight the exact field — no guessing
       const code = res.errorCode || "";
@@ -451,7 +520,9 @@ async function fpVerifyAndReset(){
   setMsg('resetMsg3','','');
   try {
     const hashedNew = await sha256(newPass);
-    // Security: send via POST body — OTP and hash never in URL
+    // NOTE: postData() is JSONP-over-GET (see the note near its definition
+    // above) — the OTP and hashed new password ARE included in this request's
+    // URL, not sent as a POST body. This comment previously claimed otherwise.
     const res = await postData({action:'resetPassword', UserId: _fp.userId, otp, NewPassword: hashedNew});
     if(res && res.status==='success'){
       clearInterval(_fpResendInterval);
@@ -513,7 +584,7 @@ function clearFieldErrors(){
 }
 
 // ══════════════════════════════════════════════════════════════════
-//  INIT — load temple timings + version after page ready
+//  INIT — version footer + lockout-state reflection after page ready
 // ══════════════════════════════════════════════════════════════════
 window.addEventListener("load",function(){
   // Show version
@@ -521,16 +592,27 @@ window.addEventListener("load",function(){
     const vf=document.getElementById("versionFooter");
     if(vf)vf.textContent="v"+APP.version+" · "+(APP.name||"");
   }
-  // Load temple timings from chatbot config (non-blocking)
+  // Reflect any existing lockout state immediately, instead of waiting for
+  // the user to click Login once and get bounced by _loginGuard().
   try{
-    getData("getChatbotConfig").then(function(cfg){
-      if(!cfg)return;
-      const timings=cfg.timings_en||"";
-      const bar=document.getElementById("timingsBar");
-      const txt=document.getElementById("timingsText");
-      if(bar&&txt&&timings){txt.textContent=timings;bar.style.display="block";}
-    }).catch(function(){});
+    const _srl=parseInt(sessionStorage.getItem("_server_rl_lock")||"0",10);
+    if(_srl&&Date.now()<_srl){
+      const mins=Math.ceil((_srl-Date.now())/60000);
+      setMsg("loginMsg","🔒 Too many failed attempts. Wait "+mins+" min"+(mins>1?"s":"")+" before retrying.","error");
+      const btn=document.getElementById("loginBtn");if(btn)btn.disabled=true;
+      setTimeout(()=>{sessionStorage.removeItem("_server_rl_lock");const b=document.getElementById("loginBtn");if(b)b.disabled=false;setMsg("loginMsg","","");},_srl-Date.now()+500);
+    }else if(_LR.isLocked()){
+      const mins=Math.ceil(_LR.remainingMs()/60000);
+      setMsg("loginMsg","🔒 Too many attempts. Wait "+mins+" min"+(mins>1?"s":"")+" before retrying.","error");
+      const btn=document.getElementById("loginBtn");if(btn)btn.disabled=true;
+      setTimeout(()=>{if(!_LR.isLocked()){const b=document.getElementById("loginBtn");if(b)b.disabled=false;setMsg("loginMsg","","");}},_LR.remainingMs()+500);
+    }
   }catch(e){}
+  // NOTE: previously also fetched getChatbotConfig() here to populate a
+  // #timingsBar/#timingsText element — neither exists in login.html, so
+  // that call was firing on every page load for a UI that can never appear.
+  // Removed. If you want a timings bar on the login page, add the markup
+  // back and this fetch can be restored.
 });
 
 // ══════════════════════════════════════════════════════════════════
@@ -634,9 +716,15 @@ function openRegisterModal(){
   document.getElementById('regHeader1').style.display='';
   document.getElementById('regHeader2').style.display='none';
   document.getElementById('registerModal').style.display='flex';
-  // Cap DOB picker at today — no future birthdates
+  // Cap DOB picker at today — no future birthdates.
+  // Uses local date components rather than toISOString() (which is UTC and
+  // would be a day behind for IST users in the ~5.5hr window after midnight IST).
   const dobEl=document.getElementById('reg_dob');
-  if(dobEl) dobEl.max=new Date().toISOString().slice(0,10);
+  if(dobEl){
+    const _today=new Date();
+    const _y=_today.getFullYear(), _m=String(_today.getMonth()+1).padStart(2,'0'), _d=String(_today.getDate()).padStart(2,'0');
+    dobEl.max=_y+'-'+_m+'-'+_d;
+  }
   // Disable submit until all fields are valid
   const btn=document.getElementById('regSendOtpBtn');
   if(btn){btn.disabled=true;btn.style.opacity='0.55';}
@@ -784,7 +872,7 @@ async function regVerifyAndSubmit(){
       document.getElementById('regHeader2').style.display='none';
       document.getElementById('regSuccess').style.display='block';
       document.getElementById('regSuccessMsg').innerHTML=
-        'Hi <b>'+escapeHtml(name)+'</b>, your request has been sent to the temple admin for review.<br/><br/>'+
+        'Hi <b>'+escapeHtml(name)+'</b>, your request has been sent to the household admin for review.<br/><br/>'+
         'You will receive an email at <b>'+escapeHtml(email)+'</b> once approved.';
     }else if(res&&res.message&&(res.message.toLowerCase().includes('mobile')||res.message.toLowerCase().includes('otp'))){
       if(res.message.toLowerCase().includes('otp')||res.message.toLowerCase().includes('invalid')||res.message.toLowerCase().includes('expired')){

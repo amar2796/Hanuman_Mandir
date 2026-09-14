@@ -1,0 +1,264 @@
+/* ══════════════════════════════════════════════════════════════════
+   BOLD EDITORIAL HERO — theme layer
+   Loaded AFTER design-system.css / design-system-v2.css / page CSS.
+   Purely additive: no HTML structure, IDs, classes or JS touched —
+   only visual treatment of existing selectors. Magazine-style
+   oversized serif headlines, sharp-edged flat cards, large numerals,
+   single centered login card. Keeps the maroon / saffron / gold
+   palette already set in design-system.css.
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ── 1. Global type + surface tone ── */
+body{
+  background:var(--bg-page);
+}
+h1, h2, h3, .card h2, .modal-card h2, .card-title{
+  font-family:var(--font-display) !important;
+  letter-spacing:-0.015em !important;
+}
+
+/* ── 2. Header — minimal, sharp, no rounded chrome (Home page only —
+   #mainHeader is index.html-specific; the shared .header class is
+   left alone so the user dashboard's dark-mode header still works) ── */
+#mainHeader{
+  backdrop-filter:blur(10px);
+  background:rgba(255,248,237,.92) !important;
+  border-bottom:1px solid var(--border-soft) !important;
+  box-shadow:none !important;
+}
+.nav-links a{
+  font-weight:600;
+  letter-spacing:.02em;
+  position:relative;
+}
+.nav-links a::after{
+  content:"";
+  position:absolute;left:0;bottom:-4px;
+  width:0;height:2px;background:var(--color-brand);
+  transition:width var(--dur-fast) var(--ease-out);
+}
+.nav-links a:hover::after{width:100%;}
+
+/* ── 3. Home hero — oversized editorial headline ── */
+.hero-box h1{
+  font-size:clamp(2rem, 6.4vw, 6rem) !important;
+  font-weight:600 !important;
+  line-height:0.98 !important;
+  letter-spacing:-0.02em !important;
+}
+.hero-kicker{
+  border-bottom-color:var(--color-gold) !important;
+  color:var(--color-gold) !important;
+}
+.hero-sub{
+  font-family:var(--font-display) !important;
+  font-style:italic;
+  font-weight:500 !important;
+  font-size:clamp(1rem, 2vw, 1.4rem) !important;
+  max-width:32ch;
+}
+.hero-btn{
+  border-radius:4px !important;
+  text-transform:uppercase;
+  font-size:.78rem !important;
+  letter-spacing:.08em !important;
+  font-weight:700 !important;
+  padding:16px 30px !important;
+}
+.hero-btn-primary{
+  background:var(--color-primary) !important;
+  color:#fff !important;
+  box-shadow:none !important;
+}
+.hero-btn-primary:hover{
+  background:var(--color-primary-dark) !important;
+  box-shadow:none !important;
+  transform:translateY(-2px);
+}
+
+/* Restore the site's own protection against text clipping on short
+   landscape phones — our bigger hero sizes above were overriding it. */
+@media (max-height:500px) and (orientation:landscape){
+  .hero-box h1{ font-size:clamp(1.4rem, 4.5vw, 2.2rem) !important; }
+  .hero-sub{ font-size:clamp(0.72rem, 2.5vw, 0.9rem) !important; }
+}
+
+/* ── 4. Section headings — big serif, left-aligned editorial rule ── */
+.section > h2,
+.transparency-section > h2,
+.hf-faq-section > h2,
+.feedback-section > h2{
+  font-size:clamp(1.7rem, 3.4vw, 2.6rem) !important;
+  font-weight:600 !important;
+  border-left:5px solid var(--color-brand);
+  padding-left:18px !important;
+  margin-bottom:20px !important;
+}
+
+/* ── 5. Cards — flat, sharp corners, thin rule instead of shadow.
+   .hf-contact-card is handled separately below because its
+   dark-mode border-color isn't !important, so a shorthand border
+   here would have forced a light border onto dark-mode cards. ── */
+.card,
+.modal-card,
+.feedback-form,
+.tr-card{
+  border-radius:6px !important;
+  box-shadow:none !important;
+}
+.card{
+  border-color:rgba(193,68,14,0.16) !important;
+}
+.modal-card,
+.feedback-form,
+.tr-card{
+  border:1px solid var(--border-soft) !important;
+}
+.hf-contact-card{
+  border-radius:6px !important;
+  box-shadow:none !important;
+  border-width:1px !important;
+  border-style:solid !important;
+}
+.reg-row-card{
+  border-radius:6px !important;
+}
+
+/* ── 6. Dashboard numerals — large, confident, editorial.
+   Lower floor than before (1.9rem not 2.2rem) so this still shrinks
+   properly on narrow phones instead of fighting the page's own
+   600px-breakpoint reduction. ── */
+.hero-amount,
+.skel-hero-amt{
+  font-family:var(--font-display) !important;
+  font-weight:600 !important;
+  font-size:clamp(1.9rem, 6vw, 3.4rem) !important;
+  letter-spacing:-0.02em !important;
+}
+.hero-label{
+  text-transform:uppercase;
+  font-size:.72rem !important;
+  letter-spacing:.1em !important;
+  font-weight:700 !important;
+}
+/* tr-card-value is a small stat inside a compact grid card — only
+   apply the serif treatment, not the big hero-number size, so it
+   keeps its own responsive sizing (1.6rem desktop / 1.3rem mobile)
+   instead of overflowing its card. */
+.tr-card-value{
+  font-family:var(--font-display) !important;
+  font-weight:600 !important;
+}
+.tr-card-label{
+  text-transform:uppercase;
+  font-size:.72rem !important;
+  letter-spacing:.1em !important;
+  font-weight:700 !important;
+}
+
+/* ── 7. Buttons — sharp, bold, no pill shapes ── */
+button.main-btn,
+.qa-btn,
+.btn-secondary,
+.feedback-submit-btn{
+  border-radius:4px !important;
+  font-weight:700 !important;
+  letter-spacing:.03em !important;
+  box-shadow:none !important;
+}
+
+/* ── 8. Login — single centered slim card, brand panel removed ──
+   Scoped to .login-shell only (login.html) so these rules never
+   touch the generic .card component reused on the user dashboard. */
+.login-shell .brand-panel{ display:none !important; }
+.login-shell{ justify-content:center; }
+.login-shell .login-main{ flex:1 1 100%; width:100%; }
+.login-shell .card{
+  max-width:440px;
+  border-top:5px solid var(--color-primary) !important;
+  border-radius:6px !important;
+  box-shadow:none !important;
+}
+.login-shell .card-header{
+  background:transparent !important;
+  border-bottom:1px solid var(--border-soft) !important;
+  text-align:left !important;
+  padding:32px 32px 20px !important;
+}
+.login-shell .card h2{
+  font-size:2rem !important;
+  font-weight:600 !important;
+}
+.login-shell .input-group input{
+  border-radius:4px !important;
+}
+.login-shell button.main-btn{
+  background:var(--color-primary) !important;
+  border-radius:4px !important;
+}
+.login-shell button.main-btn:hover:not(:disabled){
+  background:var(--color-primary-dark) !important;
+}
+
+/* ── 8b. Register / Forgot-password / Terms modals — match the
+   login card treatment: sharp corners, colored top bar, left-aligned
+   header instead of centered. .modal-card only exists on login.html
+   so this is safe without extra scoping. ── */
+.modal-card{
+  border-top:5px solid var(--color-primary) !important;
+}
+.modal-header{
+  background:transparent !important;
+  text-align:left !important;
+  padding:28px 28px 16px !important;
+}
+.modal-icon{
+  margin:0 0 12px !important;
+}
+.modal-icon-link{
+  display:inline-flex !important;
+}
+.modal-card h2{
+  font-size:1.7rem !important;
+  font-weight:600 !important;
+}
+.modal-card .card-subtitle{
+  text-align:left !important;
+}
+.close-btn{
+  border-radius:4px !important;
+}
+
+/* ── 8c. Registration page — square up remaining rounded elements.
+   .input-group / .reg-row-card / .reg-pending only exist on
+   login.html, so no scoping needed. ── */
+.input-group input{
+  border-radius:4px !important;
+}
+.reg-row-card{
+  border-radius:6px !important;
+}
+.reg-pending{
+  border-radius:6px !important;
+}
+.strength-bar,
+.strength-fill{
+  border-radius:2px !important;
+}
+
+/* ── 10. User dashboard — replace blocking "Connecting to server…"
+   overlay with the page's own existing skeleton shimmer.
+   The dashboard already ships with a proper skeleton screen
+   (#heroSkeleton, recent-activity spinner) — it was just hidden
+   behind this overlay. We only suppress the *loading* card; if a
+   real error occurs (#ulo_error gets .show) the overlay still shows
+   fully, exactly as before, so Retry / Back-to-Login keep working.
+   No JS/logic touched — _uloStep()/_uloStepComplete() still run,
+   they just update DOM that's no longer on screen. ── */
+#userLoadingOverlay.show:not(:has(#ulo_error.show)){
+  display:none !important;
+}
+
+.footer, #pageFooter{
+  border-top:1px solid var(--border-soft) !important;
+}

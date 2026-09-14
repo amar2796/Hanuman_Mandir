@@ -113,6 +113,17 @@ function toast(msg, type) {
       @keyframes tBar{from{width:100%}to{width:0%}}
       .to{animation:tDn .3s ease forwards!important;}
       @keyframes tDn{to{opacity:0;transform:translateY(12px)}}
+      /* [FIX] On mobile, admin.html's fixed glass bottom-nav (see
+         admin-mobile-glass-menubar.css) reserves ~80px + safe-area at the
+         bottom of .page. The toast wrapper's z-index (999999) is far above
+         the nav's (max 1100), so at the old bottom:24px it rendered on top
+         of the nav instead of above it, blocking taps on Home/Contribution/
+         Tracker/More whenever a toast was showing. Lifting it clear of that
+         reserved zone on narrow screens fixes this without touching the
+         nav's own CSS or z-index. */
+      @media (max-width: 768px){
+        #_tw{bottom:calc(88px + env(safe-area-inset-bottom));left:12px;right:12px;max-width:none;align-items:stretch;}
+      }
     `;
     document.head.appendChild(s);
   }
@@ -150,8 +161,130 @@ function getData(action) {
   });
 }
 
-/* ═══ JSONP POST ═══ */
+/* ═══ JSONP POST ═══
+   [GUARANTEE FIX] Every postData() call now carries an IdempotencyKey.
+   The OLD "read-back verify" here tried to guess success by searching
+   getAllData for a contribution matching data.Id — but no caller in
+   admin.js ever sends an Id (it's server-generated on purpose, see
+   appscript.txt), so that search key was always "" and this safety net
+   could never actually fire. That's the root cause of "saved in the
+   sheet but UI says failed".
+   NEW approach: on timeout we don't guess — we safely RESEND the exact
+   same request (same IdempotencyKey). The backend (appscript.txt,
+   _idempotencyCheckAndReserve) recognizes the key:
+     • if the original write never completed → this resend IS the write.
+     • if the original write DID complete    → backend replays the
+       original result instead of inserting a second row.
+   Either way the client gets a real answer, and duplicates are impossible
+   because the key — not a timing guess — is what the server checks.
+   ═══════════════════════════════════════════════════════════════ */
 function postData(data) {
+  // Generate the idempotency key ONCE per logical submit attempt.
+  // Mutating `data` in place means callers that stash the same payload
+  // object for a manual "Retry" button (admin.js: _contribFailedPayload,
+  // _walkInFailedPayload) automatically reuse the same key on retry —
+  // no caller changes needed for those flows.
+  if (!data.IdempotencyKey) {
+    data.IdempotencyKey = (window.crypto && crypto.randomUUID)
+      ? crypto.randomUUID()
+      : "idem_" + Date.now() + "_" + Math.random().toString(36).slice(2);
+  }
+  return _postDataOnce(data, /*isRetry*/false);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   [SEC] endSessionAndRedirect / sendLogoutBeacon — the ONE reliable
+   way to end a session, used by both admin.js and user.js.
+   ═══════════════════════════════════════════════════════════════
+   WHY THIS EXISTS:
+   postData()/getData() above are JSONP — a <script src="..."> tag,
+   which under the hood is always a GET request. Browsers cancel any
+   pending <script> tag request the moment the page navigates away.
+   That's fine for most actions (you wait for the response before doing
+   anything else), but it's fundamentally the wrong tool for "clear my
+   session AND leave this page" — the two race, and whichever the code
+   is waiting on can lose to the navigation.
+
+   This was previously solved (three separate times, independently, in
+   admin.js and user.js: logout(), beforeunload, and a 30-min visibility
+   timeout) by firing postData() and racing it against a hardcoded
+   setTimeout — redirecting whichever finishes first. That's a real race:
+   if the server takes longer than the timer, the page navigates away,
+   the browser cancels the still-pending request, and the token is never
+   actually cleared server-side — even though the UI already redirected
+   as if it had succeeded. That's the exact bug this replaces.
+
+   THE FIX: navigator.sendBeacon() is the browser API purpose-built for
+   "fire this request and guarantee it survives page unload" — it does
+   NOT get cancelled by navigation, and does NOT need a response to be
+   useful here (we're leaving the page either way). So there's nothing
+   to race against — we fire the beacon and redirect immediately.
+
+   sendBeacon always does a real POST, so this hits doPost (not doGet) —
+   see appscript.txt's doPost, action:"logout" (pre-auth, mirrors
+   clearSessionToken) — which clears SessionToken/TokenExpiry AND logs
+   the reason in one request, using the same wire format (a raw JSON
+   string body) that this codebase's other real POST calls already use
+   (e.g. uploadAndSaveProfile), so no new backend parsing was needed.
+
+   USAGE:
+     endSessionAndRedirect("User clicked logout button");                          // logout button
+     endSessionAndRedirect("Session expired - 30 min inactivity", {clearAll:true}); // forced logout, stays in-app until redirect
+     sendLogoutBeacon("Admin tab or browser closed");                              // beforeunload ONLY — no redirect (see below)
+
+   [IMPORTANT] beforeunload fires when the page is leaving for ANY reason —
+   tab close, typing a new URL, clicking an external link — not just when the
+   user is logging out. Redirecting to login.html from inside a beforeunload
+   handler would fight whatever navigation is already happening. That's why
+   this is split in two: sendLogoutBeacon() only fires the clear request (no
+   redirect, no storage wipe) — safe to call from beforeunload.
+   endSessionAndRedirect() calls it internally AND THEN also clears storage
+   and redirects — only for flows that are deliberately taking the user to
+   the login screen (the logout button, forced-timeout handlers).
+   `options.extraKeys` — additional specific localStorage keys to remove
+     (e.g. user.js's remember-me token, dark mode, language prefs).
+   `options.clearAll`  — wipe localStorage entirely instead of removing
+     specific keys (matches admin.js's original logout behavior).
+   ═══════════════════════════════════════════════════════════════ */
+function sendLogoutBeacon(reason) {
+  try {
+    const s = JSON.parse(localStorage.getItem("session") || "null");
+    if (s && s.userId) {
+      const devInfo = typeof window._getDeviceInfo === "function" ? window._getDeviceInfo() : "";
+      const payload = JSON.stringify({
+        action:       "logout",
+        userId:       s.userId,
+        sessionToken: s.sessionToken || "",
+        userName:     s.name || "User",
+        deviceInfo:   devInfo,
+        logoutReason: reason || "Session ended"
+      });
+      // No .then()/.catch()/timer needed — sendBeacon's delivery guarantee
+      // is the reliability mechanism, not a race we have to win.
+      navigator.sendBeacon(API_URL, payload);
+    }
+  } catch (e) { /* best effort — cleanupExpiredSessions() daily sweep is the backstop */ }
+}
+window.sendLogoutBeacon = sendLogoutBeacon;
+
+function endSessionAndRedirect(reason, options) {
+  options = options || {};
+  window._navFlag = true; // beforeunload handlers check this to avoid double-firing
+  sendLogoutBeacon(reason);
+
+  if (options.clearAll) {
+    try { localStorage.clear(); } catch (e) {}
+  } else {
+    try { localStorage.removeItem("session"); } catch (e) {}
+    (options.extraKeys || []).forEach(function (k) { try { localStorage.removeItem(k); } catch (e) {} });
+  }
+  try { sessionStorage.clear(); } catch (e) {}
+  history.replaceState(null, "", "login.html");
+  location.replace("login.html");
+}
+window.endSessionAndRedirect = endSessionAndRedirect;
+
+function _postDataOnce(data, isRetry) {
   return new Promise((resolve,reject)=>{
     _cbId++; const cb="cb_post_"+_cbId+"_"+Date.now(); const script=document.createElement("script"); let done=false;
     window._activeJsonpCount = (window._activeJsonpCount||0) + 1;
@@ -161,38 +294,19 @@ function postData(data) {
       _fin();
       window[cb]=function(){try{delete window[cb];script.remove();}catch(e){}};
       try{script.remove();}catch(e){}
-      // ── Read-back verify for contribution writes ──────────────────
-      // Apps Script may have committed the write even though the JSONP
-      // response was lost (cold start, network blip). For addContribution
-      // only: wait 3s then check if a new receipt appeared in getAllData.
-      // If yes → resolve as success instead of rejecting with timeout.
-      // For all other actions: reject normally (safe, no double-write risk).
-      const _action = data && data.action;
-      if (_action === "addContribution") {
-        const _sentId = String(data.Id || "");
-        setTimeout(function() {
-          // SESSION GUARD: If session was cleared (force logout, cross-device kick) during the
-          // 23-second window (20s timeout + 3s delay), getData("getAllData") would fire with no
-          // userId/token → REJECTED_NO_TOKEN logged as "Unknown". Skip fallback if session gone.
-          try {
-            var _fb_sess = JSON.parse(localStorage.getItem("session") || "null");
-            if (!_fb_sess || !_fb_sess.userId || !_fb_sess.sessionToken) return;
-          } catch(_fbe) { return; }
-          mandirCacheBust("getAllData");
-          getData("getAllData").then(function(fresh) {
-            const contribs = (fresh && fresh.contributions) || [];
-            const found = contribs.find(function(c) { return String(c.Id) === _sentId; });
-            if (found) {
-              // Write committed on server — treat as success
-              resolve({ status: "success", receiptId: found.ReceiptID || "", _recoveredFromTimeout: true });
-            } else {
-              reject(new Error("Request timed out."));
-            }
-          }).catch(function() { reject(new Error("Request timed out.")); });
-        }, 3000);
-      } else {
+      if (isRetry) {
+        // Already retried once with the same idempotency key — don't loop forever.
         reject(new Error("Request timed out."));
+        return;
       }
+      // SESSION GUARD: don't retry if the session is gone (logged out mid-request).
+      try {
+        var _fb_sess = JSON.parse(localStorage.getItem("session") || "null");
+        if (!_fb_sess || !_fb_sess.userId || !_fb_sess.sessionToken) { reject(new Error("Request timed out.")); return; }
+      } catch(_fbe) { reject(new Error("Request timed out.")); return; }
+      // Safe resend — same IdempotencyKey, so the backend either performs
+      // the write for the first time, or hands back the original result.
+      _postDataOnce(data, /*isRetry*/true).then(resolve).catch(reject);
     },20000);
     script.onerror=function(){ _fin(); clearTimeout(timer); window[cb]=function(){try{delete window[cb];}catch(e){}}; try{script.remove();}catch(e){} reject(new Error("Network error.")); };
     // ── AUTO-INJECT session token + userId so every write action is authenticated.
@@ -411,6 +525,18 @@ function mandirCacheBust(action) {
           if (typeof render          === "function") render();
           if (typeof loadSummary     === "function") loadSummary();
           if (typeof loadYears       === "function") loadYears();
+          // [FIX] Tracker page has its own render pipeline
+          // (refreshTrackerData -> applyGlobalTrackerFilters), reading
+          // from the same `data` global this function already updates
+          // above — but nothing here ever called it, so a new/edited/
+          // deleted contribution updated the underlying data correctly
+          // (visible on Home, Contribution list, exports, etc.) while
+          // the Tracker page kept showing whatever it had rendered
+          // before, until a full page reload rebuilt it from scratch.
+          // refreshTrackerData() already exists and is safe to call
+          // even when the Tracker page isn't currently open — it no-ops
+          // gracefully if its DOM elements aren't present.
+          if (typeof refreshTrackerData === "function") refreshTrackerData();
           break;
    
         case "expenses":
@@ -424,11 +550,25 @@ function mandirCacheBust(action) {
           if (typeof renderUsers         === "function") renderUsers();
           if (typeof updateUserTabCounts === "function") updateUserTabCounts(users);
           if (typeof loadUsers           === "function") loadUsers();
+          // [FIX] Same gap as the "contributions" case above — Tracker's
+          // Paid/Pending member lists and Member Ledger are built by
+          // matching contribution records against the `users` array
+          // (confirmed: admin-tracker.js reads `users` directly to build
+          // that list). Adding, editing, or deactivating a member updated
+          // `users` correctly but never told Tracker to re-render with
+          // the new member data.
+          if (typeof refreshTrackerData === "function") refreshTrackerData();
           break;
    
         case "types":
           if (typeof renderTypes === "function") renderTypes();
           if (typeof loadTypes   === "function") loadTypes();
+          // [FIX] Tracker's "Type" filter dropdown is built by
+          // populateTrackerDropdowns() (called inside refreshTrackerData),
+          // reading directly from this same `types` global — adding a new
+          // contribution type updated `types` correctly but the dropdown
+          // sitting on the Tracker page never got told to rebuild.
+          if (typeof refreshTrackerData === "function") refreshTrackerData();
           break;
    
         case "occasions":
@@ -461,6 +601,14 @@ function mandirCacheBust(action) {
           // Requests only affect the badge and contributions view
           if (typeof render      === "function") render();
           if (typeof loadSummary === "function") loadSummary();
+          // [FIX] Approving a contribution request calls the exact same
+          // "addContribution" backend action as a manual entry on the
+          // Contribution page (see admin-requests.js's
+          // _doApproveContribRequest) — it's a real new contribution
+          // record, just reached via a different button. Same gap as
+          // the "contributions" case: the record existed correctly
+          // everywhere else, but Tracker never got told to re-render.
+          if (typeof refreshTrackerData === "function") refreshTrackerData();
           break;
 
         case "summary":
@@ -556,26 +704,6 @@ function broadcastSessionRevoke(userId){
       newTabToken: window._myTabToken
     });
   }
-}
-
-/* ── Write session token to sheet after login ── */
-function setSessionTokenOnServer(userId, token){
-  // Best-effort fire-and-forget. Wrapped in try/catch so a non-redeployed
-  // Apps Script returning an HTML error page never causes a SyntaxError crash.
-  try {
-    const cb = "cb_sst_" + Date.now();
-    const script = document.createElement("script");
-    window[cb] = function(){ try{ delete window[cb]; script.remove(); }catch(e){} };
-    script.onerror = function(){ try{ delete window[cb]; script.remove(); }catch(e){} };
-    // Send token to sheet — no expiry written server-side (managed client-side only)
-    script.src = API_URL + "?action=setSessionToken&userId=" +
-      encodeURIComponent(userId) + "&token=" + encodeURIComponent(token) +
-      "&callback=" + cb;
-    document.body.appendChild(script);
-    setTimeout(function(){
-      try{ if(window[cb]){ delete window[cb]; } }catch(e){}
-    }, 12000);
-  } catch(e){ /* silent — token write is best-effort */ }
 }
 
 /* ── Cross-device poll: role-based interval (Admin 60s, User 10min) ── */
@@ -701,43 +829,76 @@ function _forceLogout(message, logoutReason){
     if(a && !a.getAttribute("target")) { window._navFlag = true; setTimeout(()=>{ window._navFlag=false; },500); }
   }, true);
 
+  // [FIX] This used to build a GET-style URL (?action=clearSessionToken&...)
+  // and pass it to sendBeacon() with NO request body. sendBeacon() always
+  // sends a POST, though — so this actually hit doPost, which unconditionally
+  // expects a JSON body (JSON.parse(e.postData.contents)). With no body, that
+  // threw immediately server-side, so this call silently failed on every
+  // single tab close. Now reuses sendLogoutBeacon() (defined above in this
+  // same file), which sends a real JSON body via sendBeacon — the version
+  // user.js already uses correctly. This one shared fix covers both admin.html
+  // and user.html, since they both load app.js.
   window.addEventListener("beforeunload", function(){
-    try {
-      // Skip if this is an in-app navigation (not a true close/refresh)
-      if(window._navFlag) return;
-      const s = JSON.parse(localStorage.getItem("session") || "null");
-      if(!s || !s.userId) return;
-      const params = new URLSearchParams({
-        action:   "clearSessionToken",
-        userId:   String(s.userId),
-        callback: "cb_beacon"
-      });
-      navigator.sendBeacon(API_URL + "?" + params.toString());
-    } catch(e){ /* silent */ }
+    if(window._navFlag) return; // in-app navigation, not a real close — skip
+    sendLogoutBeacon("Tab or browser closed");
   });
 })();
 
 
 
 function checkSession() {
-  let s=JSON.parse(localStorage.getItem("session"));
+  let s=JSON.parse(localStorage.getItem("session")||"null");
   if(!s||Date.now()>s.expiry){
+    // [H12-FIX] Try the 24h remember-me token before forcing logout.
+    // Previously this went straight to _forceLogout() even when a valid
+    // remember-token existed — so anyone mid-action (e.g. clicking
+    // "Add Contribution") with "Remember me" checked could get bounced
+    // to the login screen after 30 min, even though they'd asked to stay
+    // logged in for 24h. admin.js's page-load guard already restores from
+    // the token; this makes the same restore available to every action
+    // that calls checkSession() (add/edit/delete etc., ~10+ call sites).
+    try {
+      const rt = (typeof getRememberToken === "function") ? getRememberToken() : null;
+      if (rt && Date.now() < rt.expiry) {
+        // [FIX-24H] Previously hardcoded expiry:Date.now()+30*60*1000 here,
+        // capping a 24h remember-me session back down to 30 min on every
+        // restore — even though rt.expiry (the remember token's own real
+        // expiry) still had up to 24h left. Reuse it directly so this
+        // matches the server-side window now granted (see setSessionToken/
+        // rememberMe in login.js and appscript.txt). The "Refresh sliding
+        // expiry window on activity" line below still nudges an already-valid
+        // session forward in 30-min hops during active use — that's fine and
+        // unrelated, since this restore path is what recovers the FULL
+        // remaining time whenever the session actually lapses.
+        s = {
+          userId: rt.userId, name: rt.name, role: rt.role, email: rt.email || "",
+          sessionToken: rt.sessionToken || "", expiry: rt.expiry, ttlMs: 24*60*60*1000
+        };
+        localStorage.setItem("session", JSON.stringify(s));
+        return true;
+      }
+    } catch (e) { /* fall through to force logout below */ }
     _forceLogout("Session expired. Please login again.",
                  "Session expired - missing or corrupted");
     return false;
   }
   // Refresh sliding expiry window on activity
-  s.expiry=Date.now()+30*60*1000;
+  // [BUG FIX] Was hardcoded to 30 min regardless of ttlMs, so a "remember me" (24h) session
+  // got its client-side gate silently capped to 30 min of inactivity tolerance — a screen-lock
+  // or idle break longer than that force-logged-out a user who'd explicitly asked to stay in
+  // for 24h. Falls back to 30 min for older sessions that predate the ttlMs field.
+  s.expiry=Date.now()+(s.ttlMs||30*60*1000);
   localStorage.setItem("session",JSON.stringify(s));
   return true;
 }
 
-/* ── Auto 30-min session expiry — activity-based sliding window ── */
+/* ── Auto session expiry — activity-based sliding window (30 min normal, 24h remember-me) ── */
 (function(){
   function _touchSession(){
     let s=JSON.parse(localStorage.getItem("session")||"null");
     if(!s) return;
-    s.expiry=Date.now()+30*60*1000;
+    // [BUG FIX] Same ttlMs fix as checkSession() above — see comment there.
+    s.expiry=Date.now()+(s.ttlMs||30*60*1000);
     localStorage.setItem("session",JSON.stringify(s));
   }
   ["click","keydown","touchstart","scroll"].forEach(evt=>{
@@ -757,47 +918,18 @@ function checkSession() {
   }, 60000);
 })();
 
-/* ═══ LOCAL UPDATE ═══ */
-function updateLocalData(category,id,newData){
-  if(category==="contributions"){
-    let i=data.findIndex(x=>String(x.Id)===String(id));
-    if(i!==-1)data[i]={...data[i],...newData};
-    if(typeof render==="function")render();
-  } else if(category==="expenses"){
-    let i=expenses.findIndex(x=>String(x.Id)===String(id));
-    if(i!==-1)expenses[i]={...expenses[i],...newData};
-    if(typeof renderExpenses==="function")renderExpenses();
-  }
-  loadSummary();
-}
-
-/* ═══ YEAR DROPDOWN ═══ */
-function loadYearDropdown(){
-  const yearSelect=document.getElementById("yearSelect"); if(!yearSelect)return;
-  let years=new Set();
-  if(typeof data!=="undefined")data.forEach(c=>{let y=Number(c.Year);if(!isNaN(y)&&y>2000)years.add(y);});
-  if(typeof expenses!=="undefined")expenses.forEach(e=>{let y=Number(e.Year);if(!isNaN(y)&&y>2000)years.add(y);});
-  let curY=new Date().getFullYear();
-  for(let y=2023;y<=curY+1;y++) years.add(y);
-  let sorted=Array.from(years).filter(y=>!isNaN(y)).sort((a,b)=>b-a);
-  yearSelect.innerHTML=sorted.map(y=>`<option value="${y}"${y===curY?" selected":""}>${y}</option>`).join("");
-  yearSelect.value=curY;
-  selectedYear=curY;
-  yearSelect.onchange=function(){selectedYear=Number(this.value);if(typeof applyFilter==="function")applyFilter();};
-}
-
 /* ═══ UNIVERSAL MODAL SYSTEM ═══ */
 function _ensureModalCSS(){
   if(document.getElementById("_mCSS"))return;
   let st=document.createElement("style");st.id="_mCSS";
   st.textContent=`
     @keyframes _mF{from{opacity:0}to{opacity:1}}
-    @keyframes _mS{from{opacity:0;transform:translateY(28px)}to{opacity:1;transform:translateY(0)}}
-    #_uniModal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.55);z-index:88888;display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;animation:_mF .2s ease;}
-    ._mbox{background:#fff;border-radius:16px;width:100%;max-height:92vh;overflow-y:auto;animation:_mS .3s cubic-bezier(.21,1.02,.73,1);box-shadow:0 20px 60px rgba(0,0,0,0.25);}
+    @keyframes _mS{from{opacity:0;transform:translateY(24px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
+    #_uniModal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.55);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);z-index:88888;display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;animation:_mF .2s ease;}
+    ._mbox{background:#fff;border-radius:16px;width:100%;max-height:92vh;overflow-y:auto;overflow-x:hidden;animation:_mS .32s cubic-bezier(.21,1.02,.73,1);box-shadow:0 20px 60px rgba(0,0,0,0.25);}
     ._mbox::-webkit-scrollbar{width:5px}._mbox::-webkit-scrollbar-thumb{background:#ddd;border-radius:3px;}
     ._mhdr{background:#334155;color:#fff;padding:16px 22px;border-radius:16px 16px 0 0;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:2;}
-    ._mhdr h3{margin:0;font-size:1.05rem;font-weight:700;color:#f7a01a;display:flex;align-items:center;gap:8px;}
+    ._mhdr h3{margin:0;font-size:1.05rem;font-weight:700;color:#C1440E;display:flex;align-items:center;gap:8px;}
     ._mcls{background:none!important;border:none!important;color:#fff!important;font-size:24px;cursor:pointer;padding:0!important;box-shadow:none!important;line-height:1;transform:none!important;width:auto!important;}
     ._mbdy{padding:22px;}
     ._mft{padding:14px 22px;border-top:1px solid #eee;display:flex;gap:10px;justify-content:flex-end;background:#fafafa;border-radius:0 0 16px 16px;flex-wrap:wrap;}
@@ -806,17 +938,17 @@ function _ensureModalCSS(){
     ._rl{color:#888;font-size:12.5px;flex-shrink:0;}
     ._rv{font-size:13px;font-weight:600;color:#334155;text-align:right;}
     ._fi{width:100%;padding:10px 14px;border:1px solid #ddd;border-radius:8px;font-family:Poppins,sans-serif;font-size:13px;outline:none;transition:border-color .2s;box-sizing:border-box;margin-bottom:14px;}
-    ._fi:focus{border-color:#f7a01a;}
+    ._fi:focus{border-color:#C1440E;}
     ._fl{display:block;font-size:12px;font-weight:600;color:#555;margin-bottom:5px;}
     ._mbtn{padding:9px 20px;border:none;border-radius:8px;cursor:pointer;font-family:Poppins,sans-serif;font-size:13px;font-weight:600;color:#fff;transition:all .2s;}
     ._mbtn:hover{filter:brightness(1.1);transform:translateY(-1px);}
     @media(max-width:520px){#_uniModal{padding:8px;}._mbdy{padding:16px;}._mft{padding:12px 16px;}}
     /* CROP MODAL */
-    #_cropWrap{position:relative;overflow:hidden;background:#111;width:100%;height:300px;cursor:grab;user-select:none;touch-action:none;}
+    #_cropWrap{position:relative;overflow:hidden;background:#111;width:100%;height:min(300px,45vh);min-height:200px;cursor:grab;user-select:none;touch-action:none;}
     #_cropWrap:active{cursor:grabbing;}
     #_cropImg{position:absolute;top:0;left:0;transform-origin:top left;transition:none;}
-    #_cropBox{position:absolute;border:2.5px solid #f7a01a;box-shadow:0 0 0 9999px rgba(0,0,0,0.55);pointer-events:none;border-radius:2px;}
-    #_zoomSlider{width:100%;accent-color:#f7a01a;cursor:pointer;}
+    #_cropBox{position:absolute;border:2.5px solid #C1440E;box-shadow:0 0 0 9999px rgba(0,0,0,0.55);pointer-events:none;border-radius:2px;}
+    #_zoomSlider{width:100%;accent-color:#C1440E;cursor:pointer;}
     #_zoomLabel{font-size:11px;color:#888;text-align:center;display:block;margin:2px 0 8px;}
   `;
   document.head.appendChild(st);
@@ -835,46 +967,52 @@ function openModal(html, maxWidth){
 function closeModal(){
   let m=document.getElementById("_uniModal");
   if(m){m.style.opacity="0";m.style.transition="opacity .2s";setTimeout(()=>{m.remove();document.body.style.overflow="";},200);}
+  // The DOB/ContribStartDate field calendar (fld_calPop) is deliberately placed
+  // outside the modal so it can render above it — but that means closing the
+  // modal doesn't automatically close a still-open calendar. Close it here.
+  let fcp=document.getElementById("fld_calPop");
+  if(fcp) fcp.style.display="none";
 }
 /* ═══ CONFIRM MODAL ═══ */
 // Usage: confirmModal("Delete this item?", () => { /* confirmed */ }, "Delete", "#e74c3c")
-// confirmColor: "#e74c3c" = danger red (default), "#f7a01a" = warning orange, "#22c55e" = safe green
+// confirmColor: "#e74c3c" = danger red (default), "#C1440E" = warning orange, "#22c55e" = safe green
 function confirmModal(message, onConfirm, confirmLabel, confirmColor) {
   var label = confirmLabel || "Delete";
   var color = confirmColor || "#e74c3c";
   // Icon and ring colour — red for danger, orange for warn, green for safe
   var icon  = color === "#22c55e" ? "fa-circle-check"
-            : color === "#f7a01a" ? "fa-triangle-exclamation"
+            : color === "#C1440E" ? "fa-triangle-exclamation"
             : "fa-triangle-exclamation";
   var ringRgb = color === "#22c55e" ? "34,197,94"
-              : color === "#f7a01a" ? "247,160,26"
+              : color === "#C1440E" ? "15, 118, 110"
               : "231,76,60";
   var html = `
-    <div class="_mhdr" style="background:#fff;border-bottom:1px solid #f1f5f9;padding:18px 20px 14px;">
+    <div style="height:4px;background:${color};border-radius:16px 16px 0 0;"></div>
+    <div class="_mhdr" style="background:#fff;border-bottom:1px solid #f1f5f9;border-radius:0;padding:16px 20px 12px;">
       <span></span>
       <button class="_mcls" onclick="closeModal()" style="color:#94a3b8!important;font-size:20px;line-height:1;">&#xd7;</button>
     </div>
-    <div class="_mbdy" style="text-align:center;padding:8px 28px 28px;">
+    <div class="_mbdy" style="text-align:center;padding:6px 28px 28px;">
       <div style="
-        width:64px;height:64px;border-radius:50%;margin:0 auto 18px;
+        width:68px;height:68px;border-radius:50%;margin:0 auto 18px;
         background:rgba(${ringRgb},0.1);
         display:flex;align-items:center;justify-content:center;
-        box-shadow:0 0 0 8px rgba(${ringRgb},0.07);
+        box-shadow:0 0 0 8px rgba(${ringRgb},0.07), 0 0 0 16px rgba(${ringRgb},0.03);
         animation:_cmIconPop .35s cubic-bezier(.34,1.56,.64,1) both;
       ">
         <i class="fa-solid ${icon}" style="font-size:28px;color:${color};"></i>
       </div>
-      <p style="font-size:15px;font-weight:600;color:#1e293b;margin:0 0 6px;line-height:1.4;">${message}</p>
+      <p style="font-size:15.5px;font-weight:600;color:#1e293b;margin:0 0 6px;line-height:1.4;">${message}</p>
       <p style="font-size:12.5px;color:#94a3b8;margin:0 0 24px;">This action cannot be undone.</p>
       <div style="display:flex;gap:10px;justify-content:center;">
         <button class="_mbtn _cmCancel" style="
-          background:#f1f5f9;color:#475569;min-width:100px;
-          border:1.5px solid #e2e8f0;font-size:13.5px;
+          background:transparent;color:#64748b;min-width:104px;
+          border:1.5px solid #e2e8f0;font-size:13.5px;border-radius:10px;
         " onclick="closeModal()">
           <i class="fa-solid fa-xmark" style="margin-right:5px;"></i>Cancel
         </button>
         <button class="_mbtn" id="_confirmOkBtn" style="
-          background:${color};min-width:100px;font-size:13.5px;
+          background:${color};min-width:104px;font-size:13.5px;border-radius:10px;
           box-shadow:0 4px 14px rgba(${ringRgb},0.35);
         ">
           <i class="fa-solid fa-check" style="margin-right:5px;"></i>${label}
@@ -886,10 +1024,10 @@ function confirmModal(message, onConfirm, confirmLabel, confirmColor) {
         from{opacity:0;transform:scale(.5) rotate(-10deg)}
         to{opacity:1;transform:scale(1) rotate(0deg)}
       }
-      ._cmCancel:hover{background:#e2e8f0!important;}
+      ._cmCancel:hover:not(:disabled){background:#f8fafc!important;border-color:#94a3b8!important;color:#334155!important;}
       #_confirmOkBtn:hover{filter:brightness(1.08);transform:translateY(-1px);}
       #_confirmOkBtn:active{transform:scale(0.97) translateY(0);}
-      #_confirmOkBtn.btn-loading{cursor:wait;pointer-events:none;opacity:0.8;}
+      #_confirmOkBtn.btn-loading{cursor:wait;pointer-events:none;opacity:0.85;}
     </style>`;
   openModal(html, "340px");
   setTimeout(function() {
@@ -900,7 +1038,11 @@ function confirmModal(message, onConfirm, confirmLabel, confirmColor) {
       // close modal ONLY after onConfirm() resolves. Previously modal closed immediately
       // so user saw a flash of old data before the entry disappeared.
       btn.disabled = true;
-      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="margin-right:5px;"></i>Processing…';
+      // Same markup convention the global _setBtnLoading() helper uses (admin.js) —
+      // hide the original label, add btn-loading, and let the shared CSS
+      // button.btn-loading::after ring spinner render. Keeps the "processing" look
+      // identical everywhere instead of this modal using its own Font Awesome icon.
+      btn.innerHTML = '<span class="btn-original-content" style="display:none">' + btn.innerHTML + '</span><span class="btn-loading-txt"> Processing…</span>';
       btn.classList.add("btn-loading");
       // Also disable cancel button and backdrop click so user can't dismiss mid-action
       var cancelBtn = document.querySelector("._cmCancel");
@@ -944,7 +1086,7 @@ function openCropModal(file, onDone) {
       </div>
       <div class="_mft">
         <button class="_mbtn" style="background:#999;" onclick="closeModal()">Cancel</button>
-        <button class="_mbtn" style="background:#f7a01a;" onclick="confirmCrop()"><i class="fa-solid fa-check"></i> Use Photo</button>
+        <button class="_mbtn" style="background:#C1440E;" onclick="confirmCrop()"><i class="fa-solid fa-check"></i> Use Photo</button>
       </div>
     </div>`;
   document.body.appendChild(overlay);
@@ -1107,10 +1249,11 @@ setTimeout(function(){ _getLogoB64(function(){}); }, 500);
 /* ═══ RECEIPT POPUP — Enhanced with logo, improved design ═══ */
 /* ── Receipt helpers (shared by all receipt functions) ───────────────────── */
 
-/** Normalises a ReceiptID: migrates legacy TRX- prefix to APP.receiptPrefix */
+/** Normalises a ReceiptID: migrates legacy prefix (APP.legacyReceiptPrefix) to APP.receiptPrefix */
 function _displayRID(c) {
   const prefix = (typeof APP !== "undefined" && APP.receiptPrefix) ? APP.receiptPrefix : "REC";
-  return (c.ReceiptID || "—").replace(/^TRX-/, prefix + "-");
+  const legacy = (typeof APP !== "undefined" && APP.legacyReceiptPrefix) ? APP.legacyReceiptPrefix : "TRX";
+  return (c.ReceiptID || "—").replace(new RegExp("^" + legacy + "-"), prefix + "-");
 }
 
 /** Builds the WhatsApp text body for a contribution receipt (no duplicates) */
@@ -1154,8 +1297,8 @@ function showReceipt(c, userName, typeName, occasionName, isAdmin){
 
   // Logo HTML — show actual logo if available, else styled OM
   const logoHtml = window._logoB64
-    ? `<img src="${window._logoB64}" alt="Logo" style="width:54px;height:54px;border-radius:50%;border:2.5px solid rgba(247,160,26,0.7);object-fit:cover;background:#78501e;display:block;margin:0 auto 8px;">`
-    : `<div style="font-size:2.6rem;margin-bottom:8px;filter:drop-shadow(0 0 8px rgba(247,160,26,0.5));">${APP.symbol}</div>`;
+    ? `<img src="${window._logoB64}" alt="Logo" style="width:54px;height:54px;border-radius:50%;border:2.5px solid rgba(193, 68, 14,0.7);object-fit:cover;background:#7A1F1F;display:block;margin:0 auto 8px;">`
+    : `<div style="font-size:2.6rem;margin-bottom:8px;filter:drop-shadow(0 0 8px rgba(193, 68, 14,0.5));">${APP.symbol}</div>`;
 
   let html=`
     <div class="_mhdr"><h3><i class="fa-solid fa-receipt"></i> Contribution Receipt</h3><button class="_mcls" onclick="closeModal()">×</button></div>
@@ -1163,9 +1306,9 @@ function showReceipt(c, userName, typeName, occasionName, isAdmin){
 
       <!-- Header Band -->
       <div class="rcpt-hdr-band" style="background:linear-gradient(135deg,#1e293b 0%,#334155 60%,#3d5068 100%);padding:22px 24px 18px;text-align:center;position:relative;overflow:hidden;">
-        <div style="position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#f7a01a,#fbbf24,#f7a01a);"></div>
+        <div style="position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#C1440E,#F3C6A8,#C1440E);"></div>
         ${logoHtml}
-        <div style="font-size:1.15rem;font-weight:700;color:#f7a01a;letter-spacing:.8px;text-shadow:0 1px 4px rgba(0,0,0,0.3);">${escapeHtml(APP.name.toUpperCase())}</div>
+        <div style="font-size:1.15rem;font-weight:700;color:#C1440E;letter-spacing:.8px;text-shadow:0 1px 4px rgba(0,0,0,0.3);">${escapeHtml(APP.name.toUpperCase())}</div>
         <div style="font-size:0.72rem;color:#94a3b8;margin-top:3px;letter-spacing:.3px;">${escapeHtml(APP.location)}</div>
         <div style="margin-top:12px;">
           <span style="background:linear-gradient(135deg,#16a34a,#22c55e);color:#fff;border-radius:20px;padding:4px 16px;font-size:10.5px;font-weight:700;letter-spacing:.6px;box-shadow:0 2px 8px rgba(34,197,94,0.35);">✓ OFFICIAL RECEIPT</span>
@@ -1173,9 +1316,9 @@ function showReceipt(c, userName, typeName, occasionName, isAdmin){
       </div>
 
       <!-- Receipt ID Band -->
-      <div class="rcpt-id-band" style="background:linear-gradient(90deg,#fef3c7,#fde68a,#fef3c7);padding:10px 24px;text-align:center;border-bottom:2px solid #fcd34d;">
-        <span class="rcpt-id-label" style="color:#78350f;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;">Receipt No: </span>
-        <span class="rcpt-id-value" style="color:#92400e;font-size:15px;font-weight:700;font-family:monospace;letter-spacing:1.5px;">${escapeHtml(displayRID)}</span>
+      <div class="rcpt-id-band" style="background:linear-gradient(90deg,#fef3c7,#F3C6A8,#fef3c7);padding:10px 24px;text-align:center;border-bottom:2px solid #fcd34d;">
+        <span class="rcpt-id-label" style="color:#7A1F1F;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;">Receipt No: </span>
+        <span class="rcpt-id-value" style="color:#C1440E;font-size:15px;font-weight:700;font-family:monospace;letter-spacing:1.5px;">${escapeHtml(displayRID)}</span>
       </div>
 
       <!-- Amount Hero -->
@@ -1212,9 +1355,9 @@ function showReceipt(c, userName, typeName, occasionName, isAdmin){
       </div>
 
       <!-- Thank You -->
-      <div class="rcpt-thankyou" style="background:linear-gradient(135deg,#fef9ee,#fef3c7);padding:14px 24px;text-align:center;border-top:2px solid #fde68a;">
-        <div class="rcpt-ty-msg" style="color:#92400e;font-size:13px;font-weight:700;">🙏 ${escapeHtml(APP.thankYouMsg)}</div>
-        <div class="rcpt-ty-tag" style="color:#a16207;font-size:11px;margin-top:3px;font-style:italic;">${escapeHtml(APP.tagline)}</div>
+      <div class="rcpt-thankyou" style="background:linear-gradient(135deg,#FDF0E6,#fef3c7);padding:14px 24px;text-align:center;border-top:2px solid #F3C6A8;">
+        <div class="rcpt-ty-msg" style="color:#C1440E;font-size:13px;font-weight:700;">🙏 ${escapeHtml(APP.thankYouMsg)}</div>
+        <div class="rcpt-ty-tag" style="color:#64748b;font-size:11px;margin-top:3px;font-style:italic;">${escapeHtml(APP.tagline)}</div>
       </div>
     </div>
 
@@ -1303,10 +1446,6 @@ async function sendReceiptEmailDirect(rid){
 }
 
 /* Legacy alias kept for backward compatibility */
-function triggerReceiptEmail(rid){
-  sendReceiptEmailDirect(rid);
-}
-
 /* printReceipt — opens print dialog for the receipt modal */
 function printReceipt(rid){
   const stored = window._rcptStore[rid];
@@ -1315,7 +1454,7 @@ function printReceipt(rid){
   const displayRID = _displayRID(c);
   const payMode    = c.PaymentMode||"—";
   const logoTag    = window._logoB64
-    ? `<img src="${window._logoB64}" alt="Logo" style="width:60px;height:60px;border-radius:50%;border:3px solid rgba(247,160,26,0.7);object-fit:cover;display:block;margin:0 auto 10px;">`
+    ? `<img src="${window._logoB64}" alt="Logo" style="width:60px;height:60px;border-radius:50%;border:3px solid rgba(193, 68, 14,0.7);object-fit:cover;display:block;margin:0 auto 10px;">`
     : `<div class="om">${APP.symbol}</div>`;
   const win = window.open("","_blank","width=620,height=800");
   win.document.write(`<!DOCTYPE html><html><head><title>Receipt ${displayRID}</title>
@@ -1325,15 +1464,15 @@ function printReceipt(rid){
     body{font-family:'Poppins',Arial,sans-serif;margin:0;padding:20px;color:#333;background:#f4f6f9;}
     .card{background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.12);max-width:520px;margin:0 auto;}
     .header{background:linear-gradient(135deg,#1e293b 0%,#334155 60%,#3d5068 100%);color:#fff;padding:24px 20px 18px;text-align:center;position:relative;}
-    .header::before{content:'';position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(90deg,#f7a01a,#fbbf24,#f7a01a);}
+    .header::before{content:'';position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(90deg,#C1440E,#F3C6A8,#C1440E);}
     .header .om{font-size:2.2rem;margin-bottom:8px;}
-    .header h1{margin:4px 0;font-size:1.15rem;color:#f7a01a;font-weight:700;letter-spacing:1px;}
+    .header h1{margin:4px 0;font-size:1.15rem;color:#C1440E;font-weight:700;letter-spacing:1px;}
     .header p{margin:2px 0;font-size:0.75rem;color:#94a3b8;letter-spacing:.3px;}
     .receipt-badge{margin-top:12px;}
     .receipt-badge span{background:linear-gradient(135deg,#16a34a,#22c55e);color:#fff;padding:4px 18px;border-radius:20px;font-size:11px;font-weight:700;letter-spacing:.5px;}
-    .rid-band{background:linear-gradient(90deg,#fef3c7,#fde68a,#fef3c7);padding:11px 20px;text-align:center;border-bottom:2px solid #fcd34d;}
-    .rid-label{color:#78350f;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;}
-    .rid-value{color:#92400e;font-size:15px;font-weight:700;font-family:monospace;letter-spacing:1.5px;margin-left:6px;}
+    .rid-band{background:linear-gradient(90deg,#fef3c7,#F3C6A8,#fef3c7);padding:11px 20px;text-align:center;border-bottom:2px solid #fcd34d;}
+    .rid-label{color:#7A1F1F;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;}
+    .rid-value{color:#C1440E;font-size:15px;font-weight:700;font-family:monospace;letter-spacing:1.5px;margin-left:6px;}
     .amount-section{padding:18px 20px;text-align:center;border-bottom:1px dashed #e2e8f0;background:#fafffe;}
     .amount-label{font-size:10.5px;color:#64748b;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px;}
     .amount{font-size:2.4rem;color:#15803d;font-weight:800;letter-spacing:-0.5px;}
@@ -1343,8 +1482,8 @@ function printReceipt(rid){
     td:first-child{color:#64748b;width:44%;}
     td:last-child{font-weight:600;text-align:right;color:#1e293b;}
     .sig{display:flex;justify-content:space-between;padding:14px 16px;border-top:1px solid #e2e8f0;font-size:11px;background:#f8fafc;}
-    .footer{background:linear-gradient(135deg,#fef9ee,#fef3c7);padding:14px 20px;text-align:center;border-top:2px solid #fde68a;font-size:12.5px;color:#92400e;font-weight:700;}
-    .footer-sub{font-size:11px;color:#a16207;margin-top:3px;font-style:italic;font-weight:400;}
+    .footer{background:linear-gradient(135deg,#FDF0E6,#fef3c7);padding:14px 20px;text-align:center;border-top:2px solid #F3C6A8;font-size:12.5px;color:#C1440E;font-weight:700;}
+    .footer-sub{font-size:11px;color:#64748b;margin-top:3px;font-style:italic;font-weight:400;}
     @media print{body{padding:0;background:#fff;}.card{box-shadow:none;border-radius:0;}}
   </style></head><body>
   <div class="card">
@@ -1423,7 +1562,7 @@ async function exportReceiptPDF(rid){
   /* 1. GOLD BAND — starts flush at Y=0, no stripe above, no white gap.
         "OFFICIAL RECEIPT" left, Receipt No right */
   const BAND_H = 10;
-  doc.setFillColor(247,160,26); doc.rect(0,0,W,BAND_H,"F");
+  doc.setFillColor(15, 118, 110); doc.rect(0,0,W,BAND_H,"F");
   doc.setTextColor(26,10,0); doc.setFontSize(8); doc.setFont(undefined,"bold");
   doc.text("OFFICIAL RECEIPT", 10, 6.8);
   doc.text(displayRID, W-10, 6.8, {align:"right"});
@@ -1455,7 +1594,7 @@ async function exportReceiptPDF(rid){
   /* Logo — centered on full page width */
   const LOGO_CY = Y + 16;
   const LOGO_R  = 13;
-  doc.setFillColor(247,160,26); doc.circle(CX, LOGO_CY, LOGO_R+2, "F");
+  doc.setFillColor(15, 118, 110); doc.circle(CX, LOGO_CY, LOGO_R+2, "F");
   doc.setFillColor(255,255,255); doc.circle(CX, LOGO_CY, LOGO_R, "F");
   let logoOk = false;
   if(window._logoB64){
@@ -1471,7 +1610,7 @@ async function exportReceiptPDF(rid){
   }
 
   /* Temple name — centered on full page width */
-  doc.setTextColor(247,160,26); doc.setFontSize(16); doc.setFont(undefined,"bold");
+  doc.setTextColor(15, 118, 110); doc.setFontSize(16); doc.setFont(undefined,"bold");
   doc.text(pdfName.toUpperCase(), CX, Y+38, {align:"center"});
 
   /* Location — centered on full page width */
@@ -1481,7 +1620,7 @@ async function exportReceiptPDF(rid){
   Y += HDR_H;
 
   /* 3. GOLD DIVIDER */
-  doc.setFillColor(247,160,26); doc.rect(0,Y,W,2,"F"); Y+=2;
+  doc.setFillColor(15, 118, 110); doc.rect(0,Y,W,2,"F"); Y+=2;
 
   /* 4. AMOUNT HERO */
   const AMT_H=32;
@@ -1501,7 +1640,7 @@ async function exportReceiptPDF(rid){
   Y+=AMT_H;
 
   /* 5. DETAILS TABLE */
-  doc.setFillColor(247,160,26); doc.rect(0,Y,W,0.6,"F"); Y+=2;
+  doc.setFillColor(15, 118, 110); doc.rect(0,Y,W,0.6,"F"); Y+=2;
 
   const tableRows=[
     ["Donor Name",     _pdf(userName)||"—"],
@@ -1531,14 +1670,14 @@ async function exportReceiptPDF(rid){
     },
     didDrawCell:function(d){
       if(d.column.index===0){
-        doc.setFillColor(247,160,26);
+        doc.setFillColor(15, 118, 110);
         doc.rect(d.cell.x,d.cell.y+1.5,3,d.cell.height-3,"F");
       }
     }
   });
 
   Y=doc.lastAutoTable.finalY+1;
-  doc.setFillColor(247,160,26); doc.rect(0,Y,W,0.6,"F"); Y+=1;
+  doc.setFillColor(15, 118, 110); doc.rect(0,Y,W,0.6,"F"); Y+=1;
 
   /* 6. SIGNATURE */
   const SIG_H=20;
@@ -1557,7 +1696,7 @@ async function exportReceiptPDF(rid){
   /* 7. THANK YOU FOOTER */
   const FTR_H=20;
   doc.setFillColor(255,249,235); doc.rect(0,Y,W,FTR_H,"F");
-  doc.setFillColor(247,160,26);  doc.rect(0,Y,W,2,"F");
+  doc.setFillColor(15, 118, 110);  doc.rect(0,Y,W,2,"F");
   doc.setFontSize(11); doc.setTextColor(146,64,14); doc.setFont(undefined,"bold");
   doc.text(pdfThankYou,W/2,Y+11,{align:"center"});
   doc.setFont(undefined,"normal"); doc.setFontSize(7.5); doc.setTextColor(161,98,7);
@@ -1565,7 +1704,7 @@ async function exportReceiptPDF(rid){
   Y+=FTR_H;
 
   /* 8. GOLD BOTTOM STRIPE */
-  doc.setFillColor(247,160,26); doc.rect(0,Y,W,3,"F");
+  doc.setFillColor(15, 118, 110); doc.rect(0,Y,W,3,"F");
 
   doc.save("Receipt_"+displayRID+".pdf");
 }
@@ -1614,7 +1753,7 @@ async function _generateQRDataUrl(text, sizePx) {
 /* ═══ VIEW-ONLY DETAIL POPUP ═══ */
 function showDetailPopup(title, rows, editFn){
   let rowsHtml = rows.map(r=>`<div class="_row"><span class="_rl">${escapeHtml(String(r[0]||""))}</span><span class="_rv">${escapeHtml(String(r[1]||""))}</span></div>`).join("");
-  let editBtn = editFn ? `<button class="_mbtn" style="background:#f7a01a;" onclick="${editFn}"><i class="fa-solid fa-pen"></i> Edit</button>` : "";
+  let editBtn = editFn ? `<button class="_mbtn" style="background:#C1440E;" onclick="${editFn}"><i class="fa-solid fa-pen"></i> Edit</button>` : "";
   let html=`
     <div class="_mhdr"><h3><i class="fa-solid fa-eye"></i> ${title}</h3><button class="_mcls" onclick="closeModal()">×</button></div>
     <div class="_mbdy"><div style="border:1px solid #f0f0f0;border-radius:10px;padding:4px 16px;">${rowsHtml}</div></div>

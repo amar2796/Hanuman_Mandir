@@ -1,0 +1,189 @@
+/* ══════════════════════════════════════════════════════════════════
+   ORNATE TRADITIONAL FRAME — decorative layer
+   Loaded AFTER design-system.css / design-system-v2.css / page CSS.
+   Purely additive: no HTML structure, IDs, classes or JS touched —
+   this file only restyles existing selectors with hairline gold
+   frames, corner motifs, paper texture and refined headings.
+   Uses "Font Awesome 6 Free" fa-om glyph (\f679) for corner motifs —
+   loaded already via the FA 6.4.0 kit every page includes.
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ── 1. Warm paper texture on the page canvas ── */
+body{
+  background-color:var(--bg-page);
+  background-image:
+    radial-gradient(rgba(122,31,31,.05) 1px, transparent 1px),
+    radial-gradient(rgba(212,175,55,.05) 1px, transparent 1px);
+  background-size:26px 26px, 26px 26px;
+  background-position:0 0, 13px 13px;
+}
+
+/* ── 2. Ornate frame mixin, applied to card-like surfaces ── */
+.card,
+.modal-card,
+.reg-row-card,
+.pay-card,
+.hf-contact-card,
+.feedback-form,
+.tr-card,
+#trackerPage .tr-card,
+.gallery-swiper-section,
+.hero-box,
+.sec-panel,
+.mob-card-list .card,
+.f-grp,
+.hf-faq-item{
+  position:relative;
+  border-radius:12px !important;
+  border:1px solid var(--color-gold-soft) !important;
+  box-shadow:0 0 0 1px rgba(212,175,55,.35) inset, var(--shadow-sm) !important;
+}
+
+/* corner motif — small Om glyph, top-left & bottom-right, very quiet */
+.card::before,
+.modal-card::before,
+.pay-card::before,
+.hf-contact-card::before,
+.feedback-form::before,
+.hero-box::before{
+  content:"\f679";
+  font-family:"Font Awesome 6 Free";
+  font-weight:900;
+  position:absolute;
+  top:8px;left:10px;
+  font-size:11px;
+  color:var(--color-gold);
+  opacity:.45;
+  pointer-events:none;
+  z-index:2;
+}
+.card::after,
+.modal-card::after,
+.pay-card::after,
+.hf-contact-card::after,
+.feedback-form::after,
+.hero-box::after{
+  content:"\f679";
+  font-family:"Font Awesome 6 Free";
+  font-weight:900;
+  position:absolute;
+  bottom:8px;right:10px;
+  font-size:11px;
+  color:var(--color-gold);
+  opacity:.45;
+  pointer-events:none;
+  z-index:2;
+}
+
+/* ── 3. Section headings — serif, gold flourish underline ── */
+.section > h2,
+.transparency-section > h2,
+.hf-faq-section > h2,
+.feedback-section > h2,
+.pay-section-title,
+.card h2,
+.modal-card h2,
+.card-title,
+.card-hdr .card-title{
+  position:relative;
+  font-family:var(--font-display);
+  letter-spacing:.3px;
+  padding-bottom:14px;
+  margin-bottom:22px !important;
+}
+.section > h2::after,
+.transparency-section > h2::after,
+.hf-faq-section > h2::after,
+.feedback-section > h2::after,
+.pay-section-title::after{
+  content:"\f679";
+  font-family:"Font Awesome 6 Free";
+  font-weight:900;
+  position:absolute;
+  left:50%;bottom:0;
+  transform:translateX(-50%);
+  font-size:13px;
+  color:var(--color-gold);
+  padding:0 14px;
+  background:
+    linear-gradient(to right, transparent, var(--color-gold-soft) 15%, var(--color-gold-soft) 85%, transparent) bottom / 100% 1.5px no-repeat;
+}
+
+/* ── 4. Buttons — gold hairline ring, small-caps feel on primary CTAs ── */
+button.main-btn,
+.hero-btn-primary,
+.pay-copy-btn,
+button.reg-btn,
+.feedback-submit-btn,
+#trackerPage .tr-btn-primary{
+  border:1px solid rgba(212,175,55,.55) !important;
+  letter-spacing:.5px;
+}
+button.main-btn:focus-visible,
+.hero-btn-primary:focus-visible{
+  outline-color:var(--color-gold) !important;
+}
+
+/* ── 5. Login brand panel — gold trim along the stepped temple edge ── */
+.brand-panel{
+  box-shadow:inset -3px 0 0 rgba(212,175,55,.5);
+}
+.brand-panel::after{
+  content:"\f679";
+  font-family:"Font Awesome 6 Free";
+  font-weight:900;
+  position:absolute;
+  right:18px;bottom:14px;
+  font-size:56px;
+  color:rgba(255,255,255,.08);
+  pointer-events:none;
+  z-index:0;
+}
+
+/* ── 6. Header / nav — slim gold underline ── */
+.header,
+#mainHeader{
+  border-bottom:1px solid var(--color-gold-soft) !important;
+}
+
+/* ── 7. Footer — gold hairline with centered ornament ── */
+.footer,
+#pageFooter{
+  position:relative;
+  border-top:1px solid var(--color-gold-soft) !important;
+  padding-top:22px !important;
+}
+.footer::before,
+#pageFooter::before{
+  content:"\f679";
+  font-family:"Font Awesome 6 Free";
+  font-weight:900;
+  position:absolute;
+  top:-9px;left:50%;
+  transform:translateX(-50%);
+  font-size:13px;
+  color:var(--color-gold);
+  background:var(--bg-page);
+  padding:0 10px;
+}
+
+/* ── 8. Inputs — thin gold focus ring instead of plain brand ring ── */
+.input-group input:focus,
+.f-input-gold:focus,
+input:focus,
+select:focus,
+textarea:focus{
+  box-shadow:0 0 0 3px rgba(212,175,55,.22) !important;
+}
+
+/* ── 9. Small-screen tidy up — keep corner motifs from crowding tight cards ── */
+@media(max-width:480px){
+  .card::before,.card::after,
+  .modal-card::before,.modal-card::after,
+  .pay-card::before,.pay-card::after,
+  .hf-contact-card::before,.hf-contact-card::after,
+  .feedback-form::before,.feedback-form::after,
+  .hero-box::before,.hero-box::after{
+    font-size:9px;
+  }
+}
