@@ -89,7 +89,7 @@ function getData(action){
     _cbId++;const cb="cb_"+_cbId+"_"+Date.now();
     const s=document.createElement("script");let done=false;
     window[cb]=function(d){if(done)return;done=true;clearTimeout(t);delete window[cb];s.remove();resolve(d);};
-    const t=setTimeout(()=>{if(done)return;done=true;try{delete window[cb];s.remove();}catch(e){}reject(new Error("Request timed out."));},20000);
+    const t=setTimeout(()=>{if(done)return;done=true;try{delete window[cb];s.remove();}catch(e){}reject(new Error("Request timed out."));},45000); // 45s — was 20s; OTP-related MailApp sends can run long on the backend
     s.onerror=function(){if(done)return;done=true;clearTimeout(t);try{delete window[cb];s.remove();}catch(e){}reject(new Error("Network error."));};
     s.src=API_URL+"?action="+action+"&callback="+cb;document.body.appendChild(s);
   });
@@ -99,7 +99,7 @@ function postData(data){
     _cbId++;const cb="cb_post_"+_cbId+"_"+Date.now();
     const s=document.createElement("script");let done=false;
     window[cb]=function(r){if(done)return;done=true;clearTimeout(t);delete window[cb];s.remove();resolve(r);};
-    const t=setTimeout(()=>{if(done)return;done=true;try{delete window[cb];s.remove();}catch(e){}reject(new Error("Request timed out."));},20000);
+    const t=setTimeout(()=>{if(done)return;done=true;try{delete window[cb];s.remove();}catch(e){}reject(new Error("Request timed out."));},45000); // 45s — was 20s; sendRegistrationOTP/sendForgotPasswordOTP call MailApp.sendEmail synchronously on the backend, which can take longer than 20s
     s.onerror=function(){if(done)return;done=true;clearTimeout(t);try{delete window[cb];s.remove();}catch(e){}reject(new Error("Network error."));};
     s.src=API_URL+"?"+new URLSearchParams(data).toString()+"&callback="+cb;document.body.appendChild(s);
   });
@@ -134,8 +134,8 @@ function setSessionTokenOnServer(userId,token,rememberMe,sessionTicket){
         };
         s.src=API_URL+"?action=setSessionToken&userId="+encodeURIComponent(userId)+"&token="+encodeURIComponent(token)+"&rememberMe="+(rememberMe?"1":"0")+"&sessionTicket="+encodeURIComponent(sessionTicket||"")+"&callback="+cb;
         document.body.appendChild(s);
-        // Timeout safety: report failure after 5s max so the caller is never stuck waiting.
-        setTimeout(()=>{if(!done){done=true;try{delete window[cb];s.remove();}catch(e){}resolve(false);}},5000);
+        // Timeout safety: report failure after 45s max so the caller is never stuck waiting. (was 5s — aligned with other timeouts app-wide)
+        setTimeout(()=>{if(!done){done=true;try{delete window[cb];s.remove();}catch(e){}resolve(false);}},45000);
       }catch(e){resolve(false);}
     }
     _attempt(1);
@@ -223,7 +223,7 @@ function _attemptLogin(mobile,hashedPwd,sessionToken,rememberMeChecked,n){
       } else {
         reject(new Error("Request timed out."));
       }
-    },20000);
+    },45000); // 45s — aligned with other timeouts app-wide
     s.onerror=function(){if(done)return;done=true;clearTimeout(timer);delete window[cbName];s.remove();reject(new Error("Network error."));};
     s.src=API_URL+"?action=login&mobile="+encodeURIComponent(mobile)+"&password="+hashedPwd+
       "&token="+encodeURIComponent(sessionToken)+"&rememberMe="+(rememberMeChecked?"1":"0")+

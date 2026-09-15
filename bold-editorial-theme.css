@@ -167,6 +167,15 @@ button.main-btn,
   box-shadow:none !important;
 }
 
+/* ── 7b. Quick-action buttons (Submit Payment / Annual Report / Complete
+   Report) — exception to rule 7 above. These sit directly under the hero
+   card and Recent Activity card, both of which use var(--rad-xl) (22px)
+   rounding, so the sharp 4px from rule 7 looked mismatched. Restoring
+   the rounded corners here, scoped to .qa-btn only. */
+.qa-btn{
+  border-radius:var(--rad-xl) !important;
+}
+
 /* ── 8. Login — single centered slim card, brand panel removed ──
    Scoped to .login-shell only (login.html) so these rules never
    touch the generic .card component reused on the user dashboard. */
