@@ -5,8 +5,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <title id="adminPageTitle">Admin Panel — Household System</title>
-  <meta name="description" content="Admin panel for household management — contributions, expenses, users and more."/>
+  <title id="adminPageTitle">Admin Panel — Mandir System</title>
+  <meta name="description" content="Admin panel for mandir management — contributions, expenses, users and more."/>
   <link rel="icon" type="image/svg+xml" href="Image/logo.svg">
   <link rel="icon" type="image/png" href="Image/logo.PNG">
   <link rel="apple-touch-icon" href="Image/logo.PNG">
@@ -163,7 +163,7 @@
       </div>
       <div class="sidebar-brand">
         <div class="hdr-icon">
-          <img src="Image/logo.PNG" alt="Home Logo" class="header-logo"
+          <img src="Image/logo.webp" alt="Mandir Logo" class="header-logo"
             onerror="this.style.display='none';document.getElementById('hdrIcon').style.display='inline';">
           <i id="hdrIcon" class="fa-solid fa-house"
             style="display:none;color:#C1440E;font-size:1.4rem;filter:drop-shadow(0 0 6px rgba(193, 68, 14,0.6));"></i>
@@ -419,7 +419,7 @@
     // ══════════════════════════════════════════════════════════════
     (function() {
       if (typeof APP === 'undefined') return;
-      var name    = APP.name    || 'Home';
+      var name    = APP.name    || 'Mandir';
       var prefix  = APP.receiptPrefix || 'REC';
       var tagline = APP.tagline || '';
 
@@ -845,7 +845,7 @@
   <div class="sp-panel sp-panel-wide" id="sp-walkin">
     <div class="sp-panel-header sp-header-brown">
       <div class="sp-panel-title">
-        <i class="fa-solid fa-person-walking-arrow-right"></i> Walk-in / Manual Entry
+        <i class="fa-solid fa-person-walking-arrow-right"></i> Donation Counter / Manual Entry
       </div>
       <button class="sp-close-btn" onclick="spClose()" title="Close">
         <i class="fa-solid fa-xmark"></i>

@@ -112,8 +112,8 @@ function _renderPagination(containerId, totalPages, currentPage, onPageFn) {
             users.find((u) => String(u.UserId) === String(c.UserId))?.Name ||
             (isWalkIn
               ? String(c.Note || "")
-                .match(/Walk-in:\s*([^|]+)/)?.[1]
-                ?.trim() || "Walk-in Donor"
+                .match(/(?:Counter Donor|Walk-in):\s*([^|]+)/)?.[1]
+                ?.trim() || "Counter Donor"
               : "Unknown");
           let tName =
             types.find((t) => String(t.TypeId) === String(c.TypeId))
@@ -125,7 +125,7 @@ function _renderPagination(containerId, totalPages, currentPage, onPageFn) {
           const _rid = _storeReceipt(c, name, tName, oName);
           let displayRID = (c.ReceiptID || "").replace(new RegExp("^" + (APP.legacyReceiptPrefix||"TRX") + "-"), (APP.receiptPrefix||"REC") + "-");
           let walkInBadge = String(c.UserId).startsWith("WALKIN_")
-            ? `<span style="font-size:9px;background:#946c44;color:#fff;border-radius:4px;padding:1px 5px;margin-left:4px;vertical-align:middle;">WALK-IN</span>`
+            ? `<span style="font-size:9px;background:#946c44;color:#fff;border-radius:4px;padding:1px 5px;margin-left:4px;vertical-align:middle;">COUNTER</span>`
             : "";
           return `<tr style="cursor:default;">
         <td class="row-check" onclick="event.stopPropagation();"><input type="checkbox" class="cr2-row-check" data-id="${c.Id}" onchange="_cr2OnRowCheck()"></td>
@@ -164,8 +164,8 @@ function _renderPagination(containerId, totalPages, currentPage, onPageFn) {
         users.find((u) => String(u.UserId) === String(c.UserId))?.Name ||
         (isWalkIn
           ? String(c.Note || "")
-            .match(/Walk-in:\s*([^|]+)/)?.[1]
-            ?.trim() || "Walk-in Donor"
+            .match(/(?:Counter Donor|Walk-in):\s*([^|]+)/)?.[1]
+            ?.trim() || "Counter Donor"
           : "Unknown");
       let tName =
         types.find((t) => String(t.TypeId) === String(c.TypeId))?.TypeName ||
@@ -297,7 +297,7 @@ function _renderPagination(containerId, totalPages, currentPage, onPageFn) {
         var isWalkIn = String(c.UserId).startsWith("WALKIN_");
         var displayRID = (c.ReceiptID || "").replace(new RegExp("^" + (APP.legacyReceiptPrefix||"TRX") + "-"), (APP.receiptPrefix||"REC") + "-");
         var walkInName = isWalkIn
-          ? (String(c.Note || "").match(/Walk-in:\s*([^|]+)/)?.[1]?.trim() || "").toLowerCase()
+          ? (String(c.Note || "").match(/(?:Counter Donor|Walk-in):\s*([^|]+)/)?.[1]?.trim() || "").toLowerCase()
           : "";
         var memberName   = (user ? user.Name || "" : "").toLowerCase();
         var memberMobile = String(user ? user.Mobile || "" : "");
@@ -335,7 +335,7 @@ function _renderPagination(containerId, totalPages, currentPage, onPageFn) {
           var on = (allO.find(function(o){ return String(o.OccasionId) === occVal; }) || {}).OccasionName || occVal;
           tags.push({ label: "Occasion: " + on, clear: function(){ document.getElementById("cr_filterOccasion").value = ""; filterContributions(); } });
         }
-        if (memType) tags.push({ label: "Type: " + (memType === "member" ? "Members Only" : "Walk-in Only"), clear: function(){ document.getElementById("cr_filterMemberType").value = ""; filterContributions(); } });
+        if (memType) tags.push({ label: "Type: " + (memType === "member" ? "Members Only" : "Donation Counter Only"), clear: function(){ document.getElementById("cr_filterMemberType").value = ""; filterContributions(); } });
 
         if (tags.length === 0) {
           tagsEl.innerHTML = "";
@@ -717,7 +717,7 @@ function _renderPagination(containerId, totalPages, currentPage, onPageFn) {
                 : '<button class="btn-sm btn-danger" style="background:#cbd5e1;cursor:not-allowed;opacity:0.55;" disabled title="Cannot delete: user has \u20b9' + fmt(ct) + ' in contributions. Set status to Inactive instead."><i class="fa-solid fa-trash"></i></button>';
             })() + `
             `;
-        const _fbSvg = "Image/logo.PNG";
+        const _fbSvg = "Image/logo.webp";
         const _fbSvgFallback = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32'%3E%3Ccircle cx='16' cy='16' r='16' fill='%230F766E'/%3E%3Ctext x='16' y='21' text-anchor='middle' fill='white' font-size='14' font-family='Arial'%3E%26%23128100%3B%3C/text%3E%3C/svg%3E";
         return `
       <tr class="${rowClass}" onclick="viewUser('${u.UserId}')" title="Click to view details">

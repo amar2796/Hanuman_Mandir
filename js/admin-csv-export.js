@@ -17,7 +17,7 @@
         const user = users.find(u => String(u.UserId) === String(c.UserId));
         const displayRID = (c.ReceiptID || "").replace(new RegExp("^" + (APP.legacyReceiptPrefix||"TRX") + "-"), (APP.receiptPrefix||"REC") + "-");
         const walkInName = String(c.UserId).startsWith("WALKIN_")
-          ? (String(c.Note || "").match(/Walk-in:\s*([^|]+)/)?.[1]?.trim() || "").toLowerCase()
+          ? (String(c.Note || "").match(/(?:Counter Donor|Walk-in):\s*([^|]+)/)?.[1]?.trim() || "").toLowerCase()
           : "";
         const nameMatch = !txt ||
           (user?.Name.toLowerCase() || "").includes(txt) ||
@@ -46,7 +46,7 @@
       const headers = [
         "#", "Name", "Mobile", "Amount (₹)", "Month", "Year",
         "Type", "Occasion", "Receipt ID", "Payment Mode",
-        "Payment Date", "Note", "Walk-in"
+        "Payment Date", "Note", "Donation Counter"
       ];
 
       const rows = list.map(function (c, i) {
@@ -54,7 +54,7 @@
         const isWalkIn = String(c.UserId).startsWith("WALKIN_");
         const name = user?.Name ||
           (isWalkIn
-            ? (String(c.Note || "").match(/Walk-in:\s*([^|]+)/)?.[1]?.trim() || "Walk-in Donor")
+            ? (String(c.Note || "").match(/(?:Counter Donor|Walk-in):\s*([^|]+)/)?.[1]?.trim() || "Counter Donor")
             : "Unknown");
         const mobile = user?.Mobile || (isWalkIn ? (String(c.Note || "").match(/\|\s*(\d+)/)?.[1] || "") : "");
         const typeName = types.find(t => String(t.TypeId) === String(c.TypeId))?.TypeName || "";

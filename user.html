@@ -128,7 +128,7 @@
   <header class="header" role="banner">
     <div class="header-left">
       <div class="hdr-icon" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top" style="cursor:pointer;">
-        <img src="Image/logo.PNG" alt="Home Logo" class="header-logo" fetchpriority="high" decoding="async" width="40" height="40"
+        <img src="Image/logo.webp" alt="Mandir Logo" class="header-logo" fetchpriority="high" decoding="async" width="40" height="40"
           onerror="this.style.display='none';document.getElementById('hdrIcon').style.display='inline';">
         <i id="hdrIcon" class="fa-solid fa-house"
           style="display:none;color:#C1440E;font-size:1.4rem;filter:drop-shadow(0 0 6px rgba(193, 68, 14,0.6));"></i>
@@ -168,7 +168,7 @@
         <span class="dm-icon dm-icon-moon">🌙</span>
       </div>
       <div class="hdr-avatar-wrap">
-        <img id="hdr_photo" class="hdr-avatar" src="Image/logo.PNG" loading="eager" decoding="async"
+        <img id="hdr_photo" class="hdr-avatar" src="Image/logo.webp" loading="eager" decoding="async"
           onerror="this.onerror=null;this.src='Image/logo.PNG';"
           onclick="toggleUserDropdown()" title="Account" alt="User avatar" role="button" aria-haspopup="true" aria-expanded="false" aria-controls="userDropdown" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleUserDropdown();}" />
         <div id="userDropdown" class="hdr-dropdown" role="menu" aria-label="Account menu">
@@ -358,7 +358,7 @@
             <div class="menu-icon" style="background:rgba(193, 68, 14,0.1);">📅</div>
             <div>
               <div class="menu-title">Events &amp; Festivals</div>
-              <div class="menu-desc">Upcoming · ongoing household events</div>
+              <div class="menu-desc">Upcoming · ongoing mandir events</div>
             </div>
           </div>
           <div class="menu-right">
@@ -378,7 +378,7 @@
             <div class="menu-icon" style="background:rgba(193, 68, 14,0.1);">💬</div>
             <div>
               <div class="menu-title">Feedback</div>
-              <div class="menu-desc">Share suggestions with household admin</div>
+              <div class="menu-desc">Share suggestions with mandir admin</div>
             </div>
           </div>
           <div class="menu-right"><span class="menu-arrow">›</span></div>
@@ -388,13 +388,13 @@
         </div>
       </div>
 
-      <!-- Household Contact -->
+      <!-- Mandir Contact -->
       <div class="menu-acc-wrap">
         <div class="menu-item" id="accBtn-panelContact" onclick="_toggleAccordion('panelContact')" tabindex="0" role="button" aria-expanded="false" aria-controls="accBody-panelContact" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();_toggleAccordion('panelContact');}" >
           <div class="menu-item-left">
             <div class="menu-icon" style="background:rgba(34,197,94,0.1);">📞</div>
             <div>
-              <div class="menu-title">Household Contact</div>
+              <div class="menu-title">Mandir Contact</div>
               <div class="menu-desc">Phone, email &amp; address</div>
             </div>
           </div>
@@ -526,7 +526,7 @@
         </div>
         <div>
           <div style="font-size:12.5px;font-weight:700;color:#7A1F1F;margin-bottom:2px;">Already paid? Submit for verification</div>
-          <div style="font-size:11.5px;color:#64748b;line-height:1.55;">Paid via UPI or Cash? Submit your payment details below — household admin will verify and record it officially.</div>
+          <div style="font-size:11.5px;color:#64748b;line-height:1.55;">Paid via UPI or Cash? Submit your payment details below — mandir admin will verify and record it officially.</div>
         </div>
       </div>
 
@@ -712,7 +712,7 @@
       </div>
       <div id="hmBillList" style="display:flex;flex-direction:column;gap:10px;"></div>
       <div style="font-size:11px;color:var(--ink-faint);margin-top:10px;">
-        <i class="fa-solid fa-circle-info"></i> Saved on this device only — not synced to the shared household ledger.
+        <i class="fa-solid fa-circle-info"></i> Saved on this device only — not synced to the shared mandir ledger.
       </div>
     </div>
 
@@ -724,7 +724,7 @@
       <div class="sec-lbl"><i class="fa-solid fa-comment-dots"></i> Submit Feedback</div>
       <div class="card" style="margin-bottom:20px;">
         <div class="card-body">
-          <div style="font-size:12px;color:var(--ink-soft);margin-bottom:12px;">Share your suggestions or concerns with the household admin.</div>
+          <div style="font-size:12px;color:var(--ink-soft);margin-bottom:12px;">Share your suggestions or concerns with the mandir admin.</div>
           <div class="f-grid" style="grid-template-columns:1fr;gap:10px;">
             <div class="f-grp">
               <label>Subject</label>
@@ -748,7 +748,7 @@
       <button class="sec-panel-back" onclick="_closeMenuSection('panelContact')">
         <i class="fa-solid fa-arrow-left"></i> Back
       </button>
-      <div class="sec-lbl"><i class="fa-solid fa-phone"></i> Household Contact</div>
+      <div class="sec-lbl"><i class="fa-solid fa-phone"></i> Mandir Contact</div>
       <div class="card" style="margin-bottom:14px;">
         <div class="card-body" style="padding:14px 16px;">
           <div style="display:flex;flex-direction:column;gap:10px;">
@@ -810,7 +810,7 @@
        _doUserRetry() is defined in the retry engine below. -->
   <div id="userLoadingOverlay" role="status" aria-live="polite">
     <div class="ulo-inner">
-      <!-- Normal loading state — Home Ledger -->
+      <!-- Normal loading state — Mandir Ledger -->
       <div id="ulo_loading">
         <!-- Body -->
         <div class="ulo-card-body">
@@ -907,7 +907,7 @@
   <script src="config.js"></script>
   <script src="app.js"></script>
   <script src="user.js"></script>
-  <script src="household-features.js"></script>
+  <script src="mandir-features.js"></script>
 </body>
 
 </html>

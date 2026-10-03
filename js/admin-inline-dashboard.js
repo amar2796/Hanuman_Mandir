@@ -205,15 +205,15 @@ var dash_contributions = [];
     function dash_getDisplayName(uid, note) {
       if (!String(uid).startsWith("WALKIN_"))
         return dash_users.find(x => String(x.UserId) === String(uid))?.Name || "Unknown";
-      const match = String(note || "").match(/Walk-in:\s*([^|]+)/);
-      return match ? match[1].trim() : "Walk-in Donor";
+      const match = String(note || "").match(/(?:Counter Donor|Walk-in):\s*([^|]+)/);
+      return match ? match[1].trim() : "Counter Donor";
     }
 
     function dash_getDisplayHTML(uid, note) {
       const name = dash_getDisplayName(uid, note);
       const isWalkIn = String(uid).startsWith("WALKIN_");
       const badge = isWalkIn
-        ? `<span style="font-size:9px;background:#946c44;color:#fff;border-radius:4px;padding:1px 5px;margin-left:4px;vertical-align:middle;">WALK-IN</span>`
+        ? `<span style="font-size:9px;background:#946c44;color:#fff;border-radius:4px;padding:1px 5px;margin-left:4px;vertical-align:middle;">COUNTER</span>`
         : "";
       return `<b>${escapeHtml(name)}</b>${badge}`;
     }
@@ -402,10 +402,10 @@ var dash_contributions = [];
         });
         const lines = Object.keys(map).map(uid => {
           const name  = dash_getDisplayName(uid, noteMap[uid]);
-          const label = String(uid).startsWith("WALKIN_") ? `${name} (Walk-In)` : name;
+          const label = String(uid).startsWith("WALKIN_") ? `${name} (Counter)` : name;
           return `  ✅ ${label}: ${APP.currency||"₹"}${Number(map[uid]).toLocaleString(APP.locale||"en-IN")}`;
         }).join("\n") || "  No contributions found";
-        const msg = `${APP.symbol||"🕉️"} *${APP.name.toUpperCase()}*\n📍 ${APP.location}\n\n📊 *Contribution Report — ${period}*\n━━━━━━━━━━━━━━━━━━━━\n💰 Total: ${APP.currency||"₹"}${Number(totalC).toLocaleString(APP.locale||"en-IN")}\n🚶 Walk-in: ${APP.currency||"₹"}${Number(walkinC).toLocaleString(APP.locale||"en-IN")}\n━━━━━━━━━━━━━━━━━━━━\n${lines}\n━━━━━━━━━━━━━━━━━━━━\n_Generated — ${genDate}_`;
+        const msg = `${APP.symbol||"🕉️"} *${APP.name.toUpperCase()}*\n📍 ${APP.location}\n\n📊 *Contribution Report — ${period}*\n━━━━━━━━━━━━━━━━━━━━\n💰 Total: ${APP.currency||"₹"}${Number(totalC).toLocaleString(APP.locale||"en-IN")}\n🚶 Donation Counter: ${APP.currency||"₹"}${Number(walkinC).toLocaleString(APP.locale||"en-IN")}\n━━━━━━━━━━━━━━━━━━━━\n${lines}\n━━━━━━━━━━━━━━━━━━━━\n_Generated — ${genDate}_`;
         window.open("https://wa.me/?text=" + encodeURIComponent(msg), "_blank");
       } else {
         const rows  = _et_filtered;
@@ -440,7 +440,7 @@ var dash_contributions = [];
         });
         const lines = Object.keys(map).map(uid => {
           const name = dash_getDisplayName(uid, noteMap[uid]);
-          return `  ${String(uid).startsWith("WALKIN_") ? name+" (Walk-In)" : name}: Rs.${Number(map[uid]).toLocaleString(APP.locale||"en-IN")}`;
+          return `  ${String(uid).startsWith("WALKIN_") ? name+" (Counter)" : name}: Rs.${Number(map[uid]).toLocaleString(APP.locale||"en-IN")}`;
         }).join("\n") || "  No contributions found";
         const subject = encodeURIComponent(`Contribution Report ${period} — ${APP.name}`);
         const body    = encodeURIComponent(`${APP.name.toUpperCase()} — CONTRIBUTION REPORT ${period}\n${APP.location}\n\nTotal: Rs.${Number(totalC).toLocaleString(APP.locale||"en-IN")}\n\nDETAILS:\n${lines}\n\nGenerated — ${genDate}`);
@@ -489,7 +489,7 @@ var dash_contributions = [];
           const wk    = String(c.UserId).startsWith("WALKIN_");
           const tName = dash_types.find(x => String(x.TypeId) === String(c.TypeId))?.TypeName || "Contribution";
           const oName = dash_occasions.find(x => String(x.OccasionId) === String(c.OccasionId))?.OccasionName || "—";
-          return [_ct_fmtDate(c.PaymentDate), wk ? name+" (Walk-In)" : name, tName, c.ForMonth||"—", oName, `+${APP.currency||"₹"}${Number(c.Amount||0).toLocaleString(APP.locale||"en-IN")}`];
+          return [_ct_fmtDate(c.PaymentDate), wk ? name+" (Counter)" : name, tName, c.ForMonth||"—", oName, `+${APP.currency||"₹"}${Number(c.Amount||0).toLocaleString(APP.locale||"en-IN")}`];
         });
         doc.autoTable({ head:[["Date","Name","Type","Month","Occasion","Amount"]], body:rows, startY:35, theme:"grid", headStyles:{fillColor:[51,65,85],fontStyle:"bold"}, styles:{fontSize:8}, alternateRowStyles:{fillColor:[253,251,247]} });
       } else {

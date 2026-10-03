@@ -308,7 +308,7 @@ var _ct_filtered   = [];   // filtered contribution rows (with pending injected)
               <td>${escapeHtml(tName)}</td>
               <td>${escapeHtml(oName)}</td>
               <td>${escapeHtml(c.ForMonth||"—")}</td>
-              <td><span class="ct-badge ${isWalkIn?"ct-b-wk":"ct-b-mem"}">${isWalkIn?"Walk-in":"Member"}</span></td>
+              <td><span class="ct-badge ${isWalkIn?"ct-b-wk":"ct-b-mem"}">${isWalkIn?"Counter":"Member"}</span></td>
               <td style="font-weight:600;color:#15803d;">+${APP.currency||"₹"}${fmt(c.Amount)}</td>
               <td>${streak}</td>
               <td><span class="ct-badge ct-b-paid">Paid</span></td>
@@ -972,7 +972,7 @@ var _ct_filtered   = [];   // filtered contribution rows (with pending injected)
             var u = (typeof users !== 'undefined') ? users.find(function (x) { return String(x.UserId) === String(c.UserId); }) : null;
             var t = (typeof contribTypes !== 'undefined') ? contribTypes.find(function (x) { return String(x.TypeId) === String(c.TypeId); }) : null;
             hit = { rid:c.ReceiptID, c:c,
-              userName: u ? u.Name : (c.WalkInName || 'Walk-in'),
+              userName: u ? u.Name : (c.WalkInName || 'Counter Donor'),
               typeName: t ? t.TypeName : (c.TypeId || '--') };
           }
         });

@@ -77,7 +77,7 @@
       var textEl = document.getElementById("annText");
       var msg = (textEl && textEl.textContent.trim())
         ? textEl.textContent.trim()
-        : "Check out the latest update from our household portal.";
+        : "Check out the latest update from our mandir portal.";
       var url = window.location.href;
       var waUrl = "https://wa.me/?text=" + encodeURIComponent(msg + "\n" + url);
       window.open(waUrl, "_blank", "noopener");

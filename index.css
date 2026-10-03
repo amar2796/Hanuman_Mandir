@@ -459,7 +459,7 @@ body {
 
 /* HERO */
 .hero {
-  background-image: url("Image/Background_pic.jpg");
+  background-image: url("Image/Background_pic.webp");
   background-color: var(--color-brand);
   width: 100%;
   aspect-ratio: 1440 / 560;

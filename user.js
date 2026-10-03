@@ -41,7 +41,7 @@ const _U_NOTIF_DISMISSED = _U_PREFIX + "_notif_dismissed_ids"; // notification b
         // hdr_photo already has src="Image/logo.PNG" from HTML — leave it (logo shows).
         // hdr_drop_photo starts as "data:," — set it to logo too so both are consistent.
         const av34 = document.getElementById("hdr_drop_photo");
-        if (av34) av34.src = "Image/logo.PNG";
+        if (av34) av34.src = "Image/logo.webp";
       }
     } catch(e) {}
   })();
@@ -285,7 +285,7 @@ const _U_NOTIF_DISMISSED = _U_PREFIX + "_notif_dismissed_ids"; // notification b
     // If no PhotoURL (or photo fails to load) → logo stays. Never show initials/alphabet here.
     const hdrPhoto = document.getElementById("hdr_photo");
     const dropPhoto = document.getElementById("hdr_drop_photo");
-    const LOGO_SRC = "Image/logo.PNG";
+    const LOGO_SRC = "Image/logo.webp";
     if (hdrPhoto) hdrPhoto.src = LOGO_SRC;
     if (dropPhoto) dropPhoto.src = LOGO_SRC;
     const rawUrl = myProfile?.PhotoURL || s.photoURL || "";
@@ -2345,7 +2345,7 @@ existing updateUser action. No new Apps Script action needed.
       if (placeholder) {
         var mapContainer = placeholder.parentNode;
         var iframe = document.createElement("iframe");
-        iframe.src = "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d849.8414927304128!2d82.2058416695775!3d26.316155998562984!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x399a79fe680ff1d7%3A0x6161b25ff92ace37!2sVishwakarma%20House!5e1!3m2!1sen!2sin!4v1783874146777!5m2!1sen!2sin";
+        iframe.src = "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3273.497389457402!2d82.20519597492734!3d26.321060585267084!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x399a790bd4e8dff3%3A0x93c61c2049ae55f2!2sHanuman%20Mandir!5e1!3m2!1sen!2sin!4v1775203315104!5m2!1sen!2sin";
         iframe.width = "100%";
         iframe.height = "100%";
         iframe.style.cssText = "border:0;vertical-align:middle;";
@@ -2456,7 +2456,7 @@ existing updateUser action. No new Apps Script action needed.
     panelPayment:  { icon: "fa-hand-holding-dollar",  title: "Submit Payment" },
     panelFeedback: { icon: "fa-comment-dots",         title: "Feedback" },
     panelMaintenance: { icon: "fa-screwdriver-wrench", title: "Maintenance & Bills" },
-    panelContact:  { icon: "fa-phone",                title: "Household Contact" },
+    panelContact:  { icon: "fa-phone",                title: "Mandir Contact" },
   };
 
   // ── Open bottom sheet with panel content
@@ -2985,7 +2985,7 @@ Uses jsPDF already loaded. No server call needed.
 
       // ✅ Load logo — try multiple path/case variants
       let LOGO = null;
-      const _logoPaths = ["Image/logo.PNG", "image/logo.png", "Image/logo.png", "image/logo.PNG"];
+      const _logoPaths = ["Image/logo.webp", "Image/logo.PNG", "image/logo.png", "Image/logo.png", "image/logo.PNG"];
       for (const _lp of _logoPaths) {
         try { LOGO = await loadImageAsBase64(_lp); if (LOGO) break; } catch (e) { /* try next */ }
       }
@@ -3198,7 +3198,7 @@ Uses jsPDF already loaded. No server call needed.
           + " | Amount: Rs." + Number(stored.c.Amount || 0).toLocaleString("en-IN")
           + " | Month: " + (stored.c.ForMonth || "") + " " + (stored.c.Year || "")
           + " | Date: " + formatPaymentDate(stored.c.PaymentDate)
-          + " | Home: " + APP.name + ", " + APP.location;
+          + " | Mandir: " + APP.name + ", " + APP.location;
       }
       if (_origQR) return _origQR(richText, sizePx);
       return null;
@@ -3697,10 +3697,10 @@ if (isDark) {
     ["#menuTitle-panelStats",               "Statistics",                 "आंकड़े"],
     ["#menuDesc-panelStats",                "Month-wise & type breakdown","माहवार और प्रकार अनुसार विवरण"],
     ["#menuTitle-panelEvents",              "Events & Festivals",         "कार्यक्रम और त्योहार"],
-    ["#menuDesc-panelEvents",               "Upcoming · ongoing household events","आगामी घरेलू कार्यक्रम"],
+    ["#menuDesc-panelEvents",               "Upcoming · ongoing mandir events","आगामी मंदिर कार्यक्रम"],
     ["#menuTitle-panelFeedback",            "Feedback",                   "सुझाव / प्रतिक्रिया"],
-    ["#menuDesc-panelFeedback",             "Share suggestions with household admin","घर प्रशासन को सुझाव दें"],
-    ["#menuTitle-panelContact",             "Household Contact",             "घर से संपर्क"],
+    ["#menuDesc-panelFeedback",             "Share suggestions with mandir admin","मंदिर प्रशासन को सुझाव दें"],
+    ["#menuTitle-panelContact",             "Mandir Contact",             "मंदिर से संपर्क"],
     ["#menuDesc-panelContact",              "Phone, email & address",     "फ़ोन, ईमेल और पता"],
     // Dropdown menu items
     ["#dropItem-profile",                   "My Profile",                 "मेरी प्रोफ़ाइल"],
@@ -3721,8 +3721,8 @@ if (isDark) {
     "Submit Payment Request":   "भुगतान अनुरोध जमा करें",
     "My Payment Requests":      "मेरे भुगतान अनुरोध",
     "Submit Feedback":          "सुझाव / प्रतिक्रिया दें",
-    "Household Contact":           "घर से संपर्क",
-    "Household Goals":             "घर के लक्ष्य",
+    "Mandir Contact":           "मंदिर से संपर्क",
+    "Mandir Goals":             "मंदिर के लक्ष्य",
     "Filter & Search":          "फ़िल्टर और खोज",
     // Card titles
     "Records":                  "रिकॉर्ड",

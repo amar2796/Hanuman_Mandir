@@ -1240,7 +1240,7 @@ function _getLogoB64(cb) {
       } catch(e) { cb(null); }
     };
     img.onerror = function() { cb(null); };
-    img.src = "Image/logo.PNG?" + Date.now();
+    img.src = "Image/logo.webp?" + Date.now();
   } catch(e) { cb(null); }
 }
 /* Pre-load logo as soon as app.js runs */

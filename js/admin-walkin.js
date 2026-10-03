@@ -100,7 +100,7 @@
       const month = document.getElementById("wi_month").value;
       const typeId = document.getElementById("wi_type").value;
       const occasionId = document.getElementById("wi_occasion").value;
-      const note = document.getElementById("wi_note").value.trim();
+      const note = document.getElementById("wi_note").value.trim() || "Jai Shree Ram"; // default when left blank (same as Add Contribution)
       if (!name) return toast("Please enter donor name.", "error");
       if (!amount || Number(amount) <= 0) return toast("Please enter a valid amount.", "error");
 
@@ -116,7 +116,7 @@
 
       const previewHtml = `
         <div class="_mhdr">
-          <h3><i class="fa-solid fa-eye" style="color:#946c44;margin-right:8px;"></i> Preview Walk-in Entry</h3>
+          <h3><i class="fa-solid fa-eye" style="color:#946c44;margin-right:8px;"></i> Preview Donation Counter Entry</h3>
           <button class="_mcls" onclick="closeModal()">×</button>
         </div>
         <div class="_mbdy">
@@ -263,7 +263,7 @@
       const month = document.getElementById("wprev_month")?.value;
       const typeId = document.getElementById("wprev_type")?.value;
       const occasionId = document.getElementById("wprev_occasion")?.value;
-      const note = (document.getElementById("wprev_note")?.value||"").trim();
+      const note = (document.getElementById("wprev_note")?.value||"").trim() || "Jai Shree Ram"; // default even if cleared in the review step
       if (!name) { _walkInInFlight=false; if(btn){btn.disabled=false;btn.innerHTML='<i class="fa-solid fa-check"></i> Confirm & Save';} return toast("Please enter donor name.", "error"); }
       if (!amount || Number(amount) <= 0) { _walkInInFlight=false; if(btn){btn.disabled=false;btn.innerHTML='<i class="fa-solid fa-check"></i> Confirm & Save';} return toast("Please enter a valid amount.", "error"); }
       // [ID] Send "WALKIN" as signal — backend generates WALKIN_YYYY_NNNNN (year-wise sequential)
@@ -280,7 +280,7 @@
           Year: year,
           TypeId: typeId,
           OccasionId: occasionId,
-          Note: (note ? note + " | " : "") + "Walk-in: " + name + (mobile ? " | " + mobile : ""),
+          Note: (note ? note + " | " : "") + "Counter Donor: " + name + (mobile ? " | " + mobile : ""),
           // Fresh key each call — see _genIdemKey comment near its definition.
           // "Retry as-is" (_retryWalkInFailed) resends this exact stored payload
           // object instead of calling this function again, keeping that path's
@@ -315,7 +315,7 @@
                 'animation:_csBounce 0.5s cubic-bezier(0.34,1.56,0.64,1) both;">' +
                   '<i class="fa-solid fa-circle-check" style="color:#16a34a;font-size:2rem;"></i>' +
                 '</div>' +
-                '<div style="font-size:18px;font-weight:700;color:#1e293b;margin-bottom:4px;">Walk-in Entry Saved!</div>' +
+                '<div style="font-size:18px;font-weight:700;color:#1e293b;margin-bottom:4px;">Donation Counter Entry Saved!</div>' +
                 '<div style="font-size:12px;color:#64748b;margin-bottom:14px;">Entry recorded successfully</div>' +
               '</div>' +
               '<div style="background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:12px;' +
@@ -411,7 +411,7 @@
     /* ── Retry failed walk-in using the exact same payload ── */
     async function _retryWalkInFailed() {
       const stored = window._walkInFailedPayload;
-      if (!stored) return toast("No failed walk-in entry to retry.", "error");
+      if (!stored) return toast("No failed donation counter entry to retry.", "error");
       if (_walkInInFlight) return;
       _walkInInFlight = true;
       const wiBody = document.getElementById("sp-walkin-body");
@@ -442,7 +442,7 @@
                 '<div style="width:72px;height:72px;background:linear-gradient(135deg,#ecfdf5,#d1fae5);border-radius:50%;display:flex;align-items:center;justify-content:center;margin-bottom:16px;border:2px solid #6ee7b7;animation:_csBounce 0.5s cubic-bezier(0.34,1.56,0.64,1) both;">' +
                   '<i class="fa-solid fa-circle-check" style="color:#16a34a;font-size:2rem;"></i>' +
                 '</div>' +
-                '<div style="font-size:18px;font-weight:700;color:#1e293b;margin-bottom:4px;">Walk-in Entry Saved!</div>' +
+                '<div style="font-size:18px;font-weight:700;color:#1e293b;margin-bottom:4px;">Donation Counter Entry Saved!</div>' +
                 '<div style="font-size:12px;color:#64748b;margin-bottom:14px;">Entry recorded successfully</div>' +
               '</div>' +
               '<div style="background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:12px;padding:14px 16px;margin:0 4px 14px;font-size:12.5px;">' +

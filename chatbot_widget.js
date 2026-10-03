@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════
-   HOUSEHOLD CHATBOT WIDGET — chatbot_widget.js
+   MANDIR CHATBOT WIDGET — chatbot_widget.js
    Include this file on: index.html, login.html, user.html
    Requires: config.js (for API_URL) and constants.js (for APP)
    to be loaded BEFORE this script.
@@ -343,11 +343,11 @@
       win.innerHTML = `
         <div id="_mbotHdr">
           <div class="mbot-avatar">
-             <img src="Image/logo.PNG" alt="Home Logo" class="mbot-logo" onerror="this.style.display='none';document.getElementById('hdrIcon').style.display='inline';">
+             <img src="Image/logo.webp" alt="Mandir Logo" class="mbot-logo" onerror="this.style.display='none';document.getElementById('hdrIcon').style.display='inline';">
             <i id="hdrIcon" class="fa-solid fa-house" style="display:none;color:#C1440E;font-size:1.4rem;filter:drop-shadow(0 0 6px rgba(193, 68, 14,0.6));"></i>
           </div>
           <div class="mbot-title">
-            <div>Home Assistant</div>
+            <div>Mandir Assistant</div>
             <div>Online · <span id="_mbotTagline">Jai Shree Ram</span></div>
           </div>
           <button class="mbot-hbtn" id="_mbotLangBtn" onclick="_mbotToggleLang()">HI</button>
@@ -495,22 +495,22 @@
       _withTyping(function () {
         switch (topic) {
           case "timings":
-            _addBotMsg(_t("timings") || "Please contact the household for the schedule.");
+            _addBotMsg(_t("timings") || "Please contact the mandir for the schedule.");
             break;
           case "location":
-            _addBotMsg(_t("location") || "Please contact the household for location details.");
+            _addBotMsg(_t("location") || "Please contact the mandir for location details.");
             break;
           case "donate":
-            _addBotMsg(_t("donate") || "Please contact the household to learn how to contribute.");
+            _addBotMsg(_t("donate") || "Please contact the mandir to learn how to contribute.");
             break;
           case "bank":    _answerBank();    return;
           case "upi":     _answerUPI();     return;
           case "contact": _answerContact(); return;
           case "custom1":
-            _addBotMsg(_t("custom_a1") || "Please contact the household admin for more information.");
+            _addBotMsg(_t("custom_a1") || "Please contact the mandir admin for more information.");
             break;
           case "custom2":
-            _addBotMsg(_t("custom_a2") || "Please contact the household admin for more information.");
+            _addBotMsg(_t("custom_a2") || "Please contact the mandir admin for more information.");
             break;
         }
         _showBackMenu();
@@ -542,8 +542,8 @@
           bi = _cfg("bank_ifsc"), bb = _cfg("bank_branch");
       if (!bn && !ba) {
         _addBotMsg(_bi(
-          "Bank details have not been set yet. Please contact the household admin.",
-          "बैंक विवरण अभी उपलब्ध नहीं है। कृपया घर के प्रशासक से संपर्क करें।"
+          "Bank details have not been set yet. Please contact the mandir admin.",
+          "बैंक विवरण अभी उपलब्ध नहीं है। कृपया मंदिर के प्रशासक से संपर्क करें।"
         ));
       } else {
         var lines = _bi("Bank Details:\n\n", "बैंक विवरण:\n\n");
@@ -560,7 +560,7 @@
       var upiId = _cfg("upi_id");
       if (!upiId) {
         _addBotMsg(_bi(
-          "UPI details have not been set yet. Please contact the household admin.",
+          "UPI details have not been set yet. Please contact the mandir admin.",
           "UPI विवरण अभी उपलब्ध नहीं है।"
         ));
         _showBackMenu();
@@ -584,7 +584,7 @@
       document.getElementById("_mbotMsgs").appendChild(qrWrap);
       _scrollBottom();
       // Generate QR
-      var appName = (window.APP && APP.name) ? APP.name : "Home";
+      var appName = (window.APP && APP.name) ? APP.name : "Mandir";
       var upiLink = "upi://pay?pa=" + encodeURIComponent(upiId) + "&pn=" + encodeURIComponent(appName) + "&cu=INR";
       _loadQR(function () {
         try {

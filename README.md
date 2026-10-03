@@ -1,2 +1,2 @@
-# Home_Mentinens
-This is for manage Home_Mentinens contribution system
+# Mandir Contribution
+This is for manage Mandir contribution system

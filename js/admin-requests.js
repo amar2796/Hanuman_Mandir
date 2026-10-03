@@ -431,7 +431,7 @@
       // Header
       doc.setFillColor(30, 41, 64); doc.rect(0, 0, W, 28, "F");
       doc.setTextColor(15, 118, 110); doc.setFontSize(14); doc.setFont(undefined, "bold");
-      doc.text((typeof APP !== "undefined" ? APP.name : "Home").toUpperCase(), W / 2, 12, { align: "center" });
+      doc.text((typeof APP !== "undefined" ? APP.name : "Mandir").toUpperCase(), W / 2, 12, { align: "center" });
       doc.setTextColor(148, 163, 184); doc.setFontSize(9); doc.setFont(undefined, "normal");
       doc.text("Annual Financial Report", W / 2, 20, { align: "center" });
       Y = 36;

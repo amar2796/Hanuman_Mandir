@@ -80,7 +80,7 @@
                   <div style="font-weight:700;color:#1e293b;font-size:14px;margin-bottom:4px;">
                     <i class="fa-solid fa-cake-candles" style="color:#ec4899;margin-right:6px;"></i>Birthday Email
                   </div>
-                  <div style="font-size:11.5px;color:#64748b;line-height:1.6;">Automatically sends a beautiful household-themed birthday email directly to the member on their birthday. Runs daily via Apps Script trigger at 8 AM.</div>
+                  <div style="font-size:11.5px;color:#64748b;line-height:1.6;">Automatically sends a beautiful mandir-themed birthday email directly to the member on their birthday. Runs daily via Apps Script trigger at 8 AM.</div>
                 </div>
                 <label class="ea-toggle" style="flex-shrink:0;">
                   <input type="checkbox" id="toggle_birthday_email"
@@ -186,7 +186,7 @@
                 <ul style="margin:0;padding-left:16px;line-height:1.8;color:#64748b;">
                   <li>Runs daily at 8 AM via Apps Script trigger</li>
                   <li>Sent only to member whose birthday is today</li>
-                  <li>Household-themed email in Hindi + English</li>
+                  <li>Mandir-themed email in Hindi + English</li>
                   <li>Skipped if daily email quota is full</li>
                 </ul>
               </div>
@@ -210,8 +210,9 @@
               <code>sendBirthdayEmails</code> → <strong>Time-based → Day timer → 8 AM &ndash; 9 AM</strong>.
               <br/><br/>
               <i class="fa-solid fa-clipboard-list" style="color:#7c3aed;"></i>
-              Admin Monthly Summary requires its own trigger: Apps Script → Triggers → Add trigger →
-              <code>sendAdminMonthlySummary</code> → Month timer → day of your choice.
+              Admin Monthly Summary (sent on the last day of every month): in Apps Script, run
+              <code>setupAdminMonthlySummaryTrigger</code> <strong>once</strong>. It creates a daily trigger
+              (<code>sendAdminMonthlySummaryIfLastDay</code>, about 9 PM) that sends only on the last day of the month.
             </div>
           </div>
 

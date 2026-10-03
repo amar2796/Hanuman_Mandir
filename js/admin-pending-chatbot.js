@@ -88,7 +88,7 @@
          A rejection email will be sent.
        </p>
        <label class="_fl">Reason <span style="color:#aaa;font-weight:400;">(optional — shown in email)</span></label>
-       <textarea class="_fi" id="rejectReason" placeholder="e.g. Could not verify identity. Please contact household admin." rows="3"
+       <textarea class="_fi" id="rejectReason" placeholder="e.g. Could not verify identity. Please contact mandir admin." rows="3"
          style="resize:vertical;min-height:70px;"></textarea>
      </div>
      <div class="_mft">

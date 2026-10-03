@@ -503,7 +503,7 @@
       var el = document.getElementById("hm_walkin_list");
       if (!el) return;
       if (!walkIns || walkIns.length === 0) {
-        el.innerHTML = '<div style="text-align:center;padding:20px;color:#94a3b8;font-size:12px;">No walk-in entries this month</div>';
+        el.innerHTML = '<div style="text-align:center;padding:20px;color:#94a3b8;font-size:12px;">No donation counter entries this month</div>';
         return;
       }
       // Show most recent 8
@@ -512,7 +512,7 @@
       }).slice(0, 8);
 
       el.innerHTML = recent.map(function(c) {
-        var nameRaw = String(c.Note||"").match(/Walk-in:\s*([^|]+)/);
+        var nameRaw = String(c.Note||"").match(/(?:Counter Donor|Walk-in):\s*([^|]+)/);
         var visitorName = nameRaw ? nameRaw[1].trim() : "Visitor";
         var typeName = (types.find(function(t) { return String(t.TypeId) === String(c.TypeId); }) || {}).TypeName || "Daan";
         var dateStr = c.PaymentDate

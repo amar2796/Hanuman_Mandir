@@ -338,7 +338,7 @@
       const mobile = decodeURIComponent(encodedMobile).replace(/\D/g, "");
       if (!mobile || mobile.length < 10) { toast("No valid mobile number for this member.", "warn"); return; }
       const s = JSON.parse(localStorage.getItem("session") || "{}");
-      const waText = encodeURIComponent(APP.name + " — Admin Reply:\n\n" + msg + "\n\n— " + (s.name || "Household Admin"));
+      const waText = encodeURIComponent(APP.name + " — Admin Reply:\n\n" + msg + "\n\n— " + (s.name || "Mandir Admin"));
       window.open("https://wa.me/91" + mobile + "?text=" + waText, "_blank");
       // Mark as replied
       postData({
