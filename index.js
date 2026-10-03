@@ -3,22 +3,74 @@
       var _gcPhotos = [], _gcLbIdx = 0;
       var _swiperInstance = null;
 
+      /* ── Home-page data cache (stale-while-revalidate) ──
+         Public data (gallery / member count / announcement) is saved in
+         localStorage after every successful fetch. On the next visit it is
+         shown instantly while the fresh copy loads in the background, so the
+         page no longer waits for an Apps Script cold start. Fresh data always
+         replaces the cached copy. If localStorage is unavailable everything
+         works exactly as before. */
+      var _HOME_CACHE_PREFIX  = "mandir_home_";
+      var _HOME_STALE_MAX     = 7 * 24 * 60 * 60 * 1000;  // gallery / stats: show cached copy up to 7 days old
+      var _HOME_ANN_STALE_MAX = 6 * 60 * 60 * 1000;       // announcement: only 6 hours (it changes more often)
+      function _homeCacheGet(key, maxAgeMs) {
+        try {
+          var raw = localStorage.getItem(_HOME_CACHE_PREFIX + key);
+          if (!raw) return null;
+          var o = JSON.parse(raw);
+          if (!o || typeof o.ts !== "number") return null;
+          if (maxAgeMs && (Date.now() - o.ts) > maxAgeMs) return null;
+          return o.data;
+        } catch (e) { return null; }
+      }
+      function _homeCacheSet(key, data) {
+        try {
+          localStorage.setItem(_HOME_CACHE_PREFIX + key, JSON.stringify({ ts: Date.now(), data: data }));
+        } catch (e) {}
+      }
+      function _homeFetch(action) {
+        // getCached() (app.js) adds in-flight de-duplication; fall back to getData() if missing
+        return (typeof getCached === "function") ? getCached(action) : getData(action);
+      }
+
       function loadGallery() {
         // Show skeleton on start
         var loadEl = document.getElementById("galleryLoading");
-        if (loadEl) loadEl.style.display = "block";
+        var shownJson = null;   // JSON of the photos currently drawn from cache (null = nothing drawn yet)
 
-        getData("getGallery").then(function(photos) {
+        // 1) Instant render from the last successful visit (if any)
+        var cached = _homeCacheGet("gallery", _HOME_STALE_MAX);
+        if (Array.isArray(cached) && cached.length > 0 && typeof Swiper !== "undefined") {
+          try {
+            _gcPhotos = cached;
+            _buildSwiper();
+            document.getElementById("galleryCarouselWrap").style.display = "block";
+            shownJson = JSON.stringify(cached);
+          } catch (e) { shownJson = null; }
+        }
+        if (shownJson === null && loadEl) loadEl.style.display = "block";
+
+        // 2) Always fetch the fresh copy and update only if it changed
+        _homeFetch("getGallery").then(function(photos) {
           if (loadEl) loadEl.style.display = "none";
-          if (!Array.isArray(photos) || photos.length === 0) {
+          if (!Array.isArray(photos)) {
+            if (shownJson !== null) return;   // bad response: keep the cached gallery on screen
             document.getElementById("galleryEmpty").style.display = "block";
             return;
           }
+          _homeCacheSet("gallery", photos);
+          if (photos.length === 0) {
+            if (shownJson !== null) document.getElementById("galleryCarouselWrap").style.display = "none";
+            document.getElementById("galleryEmpty").style.display = "block";
+            return;
+          }
+          if (JSON.stringify(photos) === shownJson) return;   // unchanged — don't restart the carousel
           _gcPhotos = photos;
           _buildSwiper();
           document.getElementById("galleryCarouselWrap").style.display = "block";
         }).catch(function() {
           if (loadEl) loadEl.style.display = "none";
+          if (shownJson !== null) return;
           document.getElementById("galleryEmpty").style.display = "block";
         });
       }
@@ -188,10 +240,25 @@
       var _statsAnimated = false;
       function loadCommunityStats() {
         if (typeof getData !== "function") return;
+        var el = document.getElementById("csMembers");
+        var shownCount = null;
+        // Instant count from the last visit (if any), then confirm with the server
+        var cached = _homeCacheGet("stats", _HOME_STALE_MAX);
+        if (cached && cached.memberCount != null) {
+          shownCount = Number(cached.memberCount || 0);
+          _animateMemberCount(el, shownCount, 1800);
+        }
         // getPublicStats is public — no session needed. Returns memberCount directly.
-        getData("getPublicStats").then(function(res) {
+        _homeFetch("getPublicStats").then(function(res) {
           if (!res || res.status === "error") return;
-          _animateMemberCount(document.getElementById("csMembers"), Number(res.memberCount || 0), 1800);
+          var n = Number(res.memberCount || 0);
+          if (res.memberCount != null) _homeCacheSet("stats", { memberCount: n });
+          if (shownCount === null) {
+            _animateMemberCount(el, n, 1800);
+          } else if (n !== shownCount && el) {
+            // cached number was out of date — settle on the fresh one after the count-up ends
+            setTimeout(function(){ el.textContent = n.toLocaleString("en-IN"); }, 2000);
+          }
         }).catch(function() {});
       }
 
@@ -370,23 +437,42 @@ var _trLoaded = false;
         setTimeout(function(){ banner.classList.remove("open"); banner.style = ""; _syncSiteTopHeight(); }, 360);
         try { sessionStorage.setItem("ann_dismissed", _annDismissedId || "1"); } catch(e){}
       }
+      function _applyAnnouncement(data) {
+        if (!data || !data.Message) return;
+        var dismissed = "";
+        try { dismissed = sessionStorage.getItem("ann_dismissed") || ""; } catch(e){}
+        var annId = String(data.Id || data.Message).substring(0, 40);
+        if (dismissed === annId) return;
+        _annDismissedId = annId;
+        document.getElementById("annText").textContent = data.Message;
+        var badge = document.getElementById("annBadge");
+        if (data.Badge) { badge.textContent = data.Badge; badge.style.display = "inline-block"; }
+        else { badge.style.display = "none"; }
+        if (data.Icon) document.querySelector(".ann-icon").textContent = data.Icon;
+        document.getElementById("announcementBanner").classList.add("open");
+        _syncSiteTopHeight();
+      }
+      // Show the last announcement instantly (no network wait); loadAnnouncement() then confirms it
+      function _applyCachedAnnouncement() {
+        var cached = _homeCacheGet("announcement", _HOME_ANN_STALE_MAX);
+        if (cached && cached.Message) _applyAnnouncement(cached);
+      }
       function loadAnnouncement() {
         if (typeof getData !== "function") return;
-        getData("getAnnouncement").then(function(data) {
-          if (!data || !data.Message) return;
-          var dismissed = "";
-          try { dismissed = sessionStorage.getItem("ann_dismissed") || ""; } catch(e){}
-          var annId = String(data.Id || data.Message).substring(0, 40);
-          if (dismissed === annId) return;
-          _annDismissedId = annId;
-          document.getElementById("annText").textContent = data.Message;
-          var badge = document.getElementById("annBadge");
-          if (data.Badge) { badge.textContent = data.Badge; badge.style.display = "inline-block"; }
-          if (data.Icon) document.querySelector(".ann-icon").textContent = data.Icon;
-          document.getElementById("announcementBanner").classList.add("open");
-          _syncSiteTopHeight();
+        _homeFetch("getAnnouncement").then(function(data) {
+          if (!data || data.error || data.status === "error") return;   // bad response: keep what is on screen
+          if (!data.Message) {
+            // Admin cleared / disabled the announcement — forget the cached copy and close the banner
+            _homeCacheSet("announcement", {});
+            var b = document.getElementById("announcementBanner");
+            if (b && b.classList.contains("open")) { b.classList.remove("open"); _syncSiteTopHeight(); }
+            return;
+          }
+          _homeCacheSet("announcement", data);
+          _applyAnnouncement(data);
         }).catch(function(){});
       }
+      document.addEventListener("DOMContentLoaded", _applyCachedAnnouncement);
       document.addEventListener("DOMContentLoaded", function(){ setTimeout(loadAnnouncement, 600); });
       document.addEventListener("DOMContentLoaded", function(){ _syncSiteTopHeight(); });
       window.addEventListener("resize", _syncSiteTopHeight);
@@ -428,7 +514,7 @@ var _trLoaded = false;
       });
 
       /* Splash */
-      window.addEventListener("load", () => {
+      document.addEventListener("DOMContentLoaded", () => {
         setTimeout(() => {
           const splash = document.getElementById("splash-screen");
           splash.classList.add("splash-hidden");
@@ -447,7 +533,7 @@ var _trLoaded = false;
           setTimeout(() => {
             splash.style.display = "none";
           }, 800);
-        }, 1500);
+        }, 600);
       });
 
       /* Audio */
