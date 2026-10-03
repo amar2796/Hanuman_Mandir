@@ -53,7 +53,7 @@ function _trShowDayDetail(day, monthName, year, namesJson) {
     : '<p style="text-align:center;color:#94a3b8;padding:20px 0;margin:0;">No collections on this day.</p>';
   const html = '<div class="_mhdr"><h3><i class="fa-solid fa-calendar-day" style="color:#C1440E;margin-right:6px;"></i> ' + _trEsc(dateLabel) + '</h3><button class="_mcls" onclick="closeModal()">×</button></div>'
     + '<div class="_mbdy" style="padding:14px 20px;">'
-    + '<div style="font-size:13px;color:#64748b;margin-bottom:10px;">' + names.length + ' ' + (names.length === 1 ? 'member' : 'members') + ' contributed' + '</div>'
+    + '<div style="font-size:13px;color:#64748b;margin-bottom:10px;">' + names.length + ' ' + (names.length === 1 ? 'contribution' : 'contributions') + ' received' + '</div>'
     + body
     + '</div>'
     + '<div class="_mft"><button class="_mbtn" style="background:#94a3b8;" onclick="closeModal()"><i class="fa-solid fa-xmark"></i> Close</button></div>';
@@ -253,6 +253,7 @@ function _trRefreshActiveTabVisuals() {
   const tab = trackerModuleState.activeTab;
   if (tab === 'analytics') renderTrackerAnalytics();
   else if (tab === 'calendar') renderTrackerCalendar();
+  else if (tab === 'counter') renderTrackerCounter();
   else if (tab === 'leaderboard') renderTrackerLeaderboard();
   else if (tab === 'predictions') renderTrackerPredictions();
   else if (tab === 'email') renderTrackerIndividualMembersList();
@@ -309,6 +310,7 @@ function switchTrackerTab(tabName, btn) {
   // Load tab content
   if (tabName === 'analytics') renderTrackerAnalytics();
   else if (tabName === 'calendar') renderTrackerCalendar();
+  else if (tabName === 'counter') renderTrackerCounter();
   else if (tabName === 'leaderboard') renderTrackerLeaderboard();
   else if (tabName === 'predictions') renderTrackerPredictions();
   // FIX: was calling switchTrackerEmailTab('bulk', null) — that function (and
@@ -1237,6 +1239,54 @@ function _trTypeBreakdownForSelectedYear() {
 // selected year — collection rate + paid/total per month, click to jump
 // straight to that month in Overview. If day-level payment dates get added
 // to the data later, this is the function to extend into a real day grid.
+// ═══ DONOR NAME HELPERS (calendar + Counter tab) ═══
+
+// Live users list (includes the Admin account and inactive members).
+function _trAllUsers() {
+  if (typeof users !== 'undefined' && users && users.length > 0) return users;
+  if (window.allUsers && window.allUsers.length > 0) return window.allUsers;
+  return [];
+}
+
+// Day-of-month of a contribution's PaymentDate (DD-MM-YYYY), or null when it
+// is not inside the given month/year.
+function _trPayDay(c, monthIdx, year, lastDay) {
+  const m = String(c.PaymentDate || '').match(/^(\d{2})-(\d{2})-(\d{4})/);
+  if (!m) return null;
+  const d = parseInt(m[1], 10), mo = parseInt(m[2], 10), y = parseInt(m[3], 10);
+  return (d >= 1 && d <= lastDay && mo === monthIdx + 1 && y === Number(year)) ? d : null;
+}
+
+// Counter / walk-in donors have no Users row. The Walk-in form saves
+//   "<purpose> | Counter Donor: <name> | <mobile>"   (older rows: "Walk-in: ...")
+// in Note. Returns { name, mobile, purpose }.
+function _trParseCounterNote(note) {
+  const s = String(note || '');
+  const m = s.match(/(?:Counter Donor|Walk-in):\s*([^|]*)(?:\|\s*([^|]*))?/);
+  const name = m ? m[1].trim() : '';
+  const mobile = (m && m[2]) ? m[2].trim() : '';
+  const at = m ? s.indexOf(m[0]) : -1;
+  const purpose = at > 0 ? s.slice(0, at).replace(/[\s|]+$/, '').trim() : (m ? '' : s.trim());
+  return { name: name || 'Counter Donor', mobile: mobile, purpose: purpose };
+}
+
+// One label per contribution: "Name — ₹amount" (counter donors get "(Counter)").
+function _trDonorLabel(c) {
+  const uid = String(c.UserId || '');
+  const amt = Number(c.Amount) || 0;
+  const locale = (typeof APP !== 'undefined' && APP && APP.locale) || 'en-IN';
+  const amtTxt = amt ? ' — ₹' + amt.toLocaleString(locale) : '';
+  let name;
+  if (uid.indexOf('WALKIN_') === 0) {
+    name = _trParseCounterNote(c.Note).name + ' (Counter)';
+  } else {
+    const pool = (trackerModuleState.allMembers || []).concat(_trAllUsers());
+    const u = pool.find(m => String(m.UserId) === uid);
+    name = (u && u.Name) ? u.Name : (uid ? 'Removed member (' + uid + ')' : 'Unknown donor');
+  }
+  return name + amtTxt;
+}
+
 function renderTrackerCalendar() {
   const container = document.getElementById('tracker_calendar_content');
   if (!container) return;
@@ -1258,61 +1308,32 @@ function renderTrackerCalendar() {
   const firstDay = new Date(selYear, monthIdx, 1).getDay();
   const lastDay = new Date(selYear, monthIdx + 1, 0).getDate();
 
-  // Group contributions by day using PaymentDate
+  // Group contributions by day using PaymentDate.
+  // Each entry is a display label for ONE contribution, so a day's count = number
+  // of contributions. The donor name comes from (in order):
+  //   1) a member in the Users list - this also finds the Admin account and
+  //      inactive members, which are left out of trackerModuleState.allMembers
+  //   2) the "Counter Donor: <name>" text in Note, for WALKIN_ (counter) donors
+  //   3) a clear "Removed member" label for deleted users, instead of "Unknown"
   const dayCollections = {};
   for (let d = 1; d <= lastDay; d++) {
     dayCollections[d] = [];
   }
 
-  filteredContribs.forEach(c => {
-    if (Number(c.Year) === Number(selYear)) {
-      // Extract day from PaymentDate (DD-MM-YYYY format)
-      let day = null;
-      if (c.PaymentDate) {
-        const dateMatch = String(c.PaymentDate).match(/^(\d{2})-(\d{2})-(\d{4})/);
-        if (dateMatch) {
-          const parsedDay = parseInt(dateMatch[1]);
-          const parsedMonth = parseInt(dateMatch[2]);
-          const parsedYear = parseInt(dateMatch[3]);
-          // Check if payment date is in the selected month/year
-          if (parsedDay >= 1 && parsedDay <= lastDay && parsedMonth === (monthIdx + 1) && parsedYear === Number(selYear)) {
-            day = parsedDay;
-          }
-        }
-      }
-
-      if (day !== null) {
-        const memberName = allMembers.find(m => String(m.UserId) === String(c.UserId))?.Name || 'Unknown';
-        dayCollections[day].push(memberName);
-      }
-    }
-  });
-
-  // Apply type filter if selected
   const typeFilter = trackerModuleState.filters.type;
-  if (typeFilter) {
-    Object.keys(dayCollections).forEach(day => {
-      const contributions = filteredContribs.filter(c => {
-        if (Number(c.Year) !== Number(selYear)) return false;
-        if (c.PaymentDate) {
-          const dateMatch = String(c.PaymentDate).match(/^(\d{2})-(\d{2})-(\d{4})/);
-          if (dateMatch) {
-            const parsedDay = parseInt(dateMatch[1]);
-            const parsedMonth = parseInt(dateMatch[2]);
-            const parsedYear = parseInt(dateMatch[3]);
-            return parsedDay === parseInt(day) && parsedMonth === (monthIdx + 1) && parsedYear === Number(selYear);
-          }
-        }
-        return false;
-      });
-      dayCollections[day] = dayCollections[day].filter(name => {
-        return contributions.some(c => {
-          const cType = (c.TypeId !== undefined && c.TypeId !== null) ? c.TypeId : c.Type;
-          return String(cType) === String(typeFilter) && allMembers.find(m => String(m.UserId) === String(c.UserId))?.Name === name;
-        });
-      });
-    });
-  }
+  filteredContribs.forEach(c => {
+    if (Number(c.Year) !== Number(selYear)) return;
+    const day = _trPayDay(c, monthIdx, selYear, lastDay);
+    if (day === null) return;
+    // Type filter is applied to the contribution itself (it used to be applied
+    // to the donor's NAME afterwards, which dropped counter donors and mixed up
+    // members who share a name).
+    if (typeFilter) {
+      const cType = (c.TypeId !== undefined && c.TypeId !== null) ? c.TypeId : c.Type;
+      if (String(cType) !== String(typeFilter)) return;
+    }
+    dayCollections[day].push(_trDonorLabel(c));
+  });
 
   // Build calendar header
   const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -1368,7 +1389,8 @@ function renderTrackerCalendar() {
     // devices, so this data was completely inaccessible on mobile before —
     // tapping a day did nothing. Now every cell also opens a modal with the
     // same info on click/tap, which works on both mobile and desktop.
-    const _dayNamesJson = _trEsc(JSON.stringify(collections));
+    // Escape for a JS single-quoted string FIRST (a name like D'Souza used to break the onclick), then for HTML.
+    const _dayNamesJson = _trEsc(JSON.stringify(collections).replace(/\\/g, '\\\\').replace(/'/g, "\\'"));
     calendarHtml += `
       <div class="tr-cal-cell" style="background:${bgColor};cursor:pointer;"
            onmouseover="this.style.transform='scale(1.05)';this.style.boxShadow='0 4px 12px rgba(0,0,0,0.1)';"
@@ -1377,7 +1399,7 @@ function renderTrackerCalendar() {
            title="${_trEsc(tooltip)}">
         <div class="tr-cal-daynum" style="color:${textColor};">${day}</div>
         <div class="tr-cal-count" style="color:${countColor};">${count}</div>
-        ${count > 0 ? `<div class="tr-cal-countlabel" style="color:${textColor};">${count} ${count === 1 ? 'member' : 'members'}</div>` : ''}
+        ${count > 0 ? `<div class="tr-cal-countlabel" style="color:${textColor};">${count} ${count === 1 ? 'donor' : 'donors'}</div>` : ''}
       </div>
     `;
   }
@@ -1387,13 +1409,248 @@ function renderTrackerCalendar() {
 
       <div class="tr-cal-legend">
         <strong>Legend:</strong><br>
-        🟡 1-2 members paid | 🔵 3-5 members paid | 🟢 6+ members paid<br>
-        <em>Hover over any day to see member names who paid</em>
+        🟡 1-2 contributions | 🔵 3-5 contributions | 🟢 6+ contributions<br>
+        <em>Tap or hover over any day to see who contributed (counter donors are marked “Counter”)</em>
       </div>
     </div>
   `;
 
   container.innerHTML = calendarHtml;
+}
+
+// ═══ COUNTER DONORS TAB ═══
+// Walk-in / counter donations (UserId = WALKIN_YYYY_NNNNN). They are kept out of
+// the member tracker on purpose (no paid/pending months for them) - this tab is
+// where they are tracked: who gave, how much, when, and who gives repeatedly.
+// Follows the global Year / Month / Type filters. Month uses the ForMonth the
+// admin picked in the Walk-in form; if that is "General" it uses the PaymentDate month.
+
+// Same donor = same mobile (last 10 digits) when one was entered, else same name.
+function _trCounterIdentity(info) {
+  const digits = String(info.mobile || '').replace(/\D/g, '');
+  return digits.length >= 6
+    ? 'm:' + digits.slice(-10)
+    : 'n:' + info.name.toLowerCase().replace(/\s+/g, ' ');
+}
+
+function _trCounterAllRows() {
+  const rows = [];
+  (trackerModuleState.yearContribs || []).forEach(c => {
+    if (String(c.UserId || '').indexOf('WALKIN_') !== 0) return;
+    const info = _trParseCounterNote(c.Note);
+    rows.push({ c: c, info: info, key: _trCounterIdentity(info), amount: Number(c.Amount) || 0 });
+  });
+  return rows;
+}
+
+function _trCounterRowMonth(c) {
+  const fm = String(c.ForMonth || '');
+  if (TRACKER_MONTH_NAMES.indexOf(fm) !== -1) return fm;
+  const pm = String(c.PaymentDate || '').match(/^(\d{2})-(\d{2})-(\d{4})/);
+  return pm ? (TRACKER_MONTH_NAMES[parseInt(pm[2], 10) - 1] || '') : '';
+}
+
+function _trCounterDateKey(c) {
+  const pm = String(c.PaymentDate || '').match(/^(\d{2})-(\d{2})-(\d{4})/);
+  return pm ? Number(pm[3]) * 10000 + Number(pm[2]) * 100 + Number(pm[1]) : 0;
+}
+
+function _trCounterFilteredRows(allRows) {
+  const year = Number(trackerModuleState.filters.year);
+  const type = trackerModuleState.filters.type;
+  const monthVal = document.getElementById('tr_month_select_global')?.value || '';
+  const monthName = monthVal ? TRACKER_MONTH_NAMES[parseInt(monthVal, 10) - 1] : '';
+  return allRows.filter(r => {
+    if (Number(r.c.Year) !== year) return false;
+    if (type) {
+      const cType = (r.c.TypeId !== undefined && r.c.TypeId !== null) ? r.c.TypeId : r.c.Type;
+      if (String(cType) !== String(type)) return false;
+    }
+    if (monthName && _trCounterRowMonth(r.c) !== monthName) return false;
+    return true;
+  });
+}
+
+function _trTypeName(c) {
+  const id = (c.TypeId !== undefined && c.TypeId !== null) ? c.TypeId : c.Type;
+  if (typeof types !== 'undefined' && types) {
+    const t = types.find(x => String(x.TypeId) === String(id));
+    if (t && t.TypeName) return t.TypeName;
+  }
+  return id ? String(id) : '—';
+}
+
+function _trOccasionName(c) {
+  if (!c.OccasionId) return '—';
+  if (typeof occasions !== 'undefined' && occasions) {
+    const o = occasions.find(x => String(x.OccasionId) === String(c.OccasionId));
+    if (o && o.OccasionName) return o.OccasionName;
+  }
+  return '—';
+}
+
+function _trMoney(n) {
+  const locale = (typeof APP !== 'undefined' && APP && APP.locale) || 'en-IN';
+  return '₹' + Number(n || 0).toLocaleString(locale);
+}
+
+function renderTrackerCounter() {
+  const container = document.getElementById('tracker_counter_content');
+  if (!container) return;
+
+  const all = _trCounterAllRows();
+  const rows = _trCounterFilteredRows(all);
+
+  // Lifetime donation count per donor (all years) - drives the "Repeat" badge.
+  const lifetime = {};
+  all.forEach(r => { lifetime[r.key] = (lifetime[r.key] || 0) + 1; });
+  rows.forEach(r => { r.lifetime = lifetime[r.key] || 1; });
+
+  // Newest first (payment date, then Id as the tie-breaker).
+  rows.sort((a, b) => (_trCounterDateKey(b.c) - _trCounterDateKey(a.c)) ||
+    String(b.c.Id || '').localeCompare(String(a.c.Id || ''), undefined, { numeric: true }));
+  trackerModuleState._counterRows = rows;
+
+  const total = rows.reduce((sum, r) => sum + r.amount, 0);
+  const donors = {};
+  rows.forEach(r => { donors[r.key] = r.lifetime; });
+  const donorKeys = Object.keys(donors);
+  const repeatCount = donorKeys.filter(k => donors[k] > 1).length;
+  const avg = rows.length ? Math.round(total / rows.length) : 0;
+
+  const monthVal = document.getElementById('tr_month_select_global')?.value || '';
+  const monthName = monthVal ? TRACKER_MONTH_NAMES[parseInt(monthVal, 10) - 1] : '';
+  const scope = (monthName ? monthName + ' ' : 'All months · ') + trackerModuleState.filters.year;
+
+  container.innerHTML =
+    '<div class="tr-panel">'
+    + '<h4 style="margin:0 0 12px;">🪙 Counter Donors <span style="font-weight:500;color:var(--tr-text-muted);font-size:12px;">— ' + _trEsc(scope) + '</span></h4>'
+    + '<div class="tr-stats-grid">'
+    +   '<div class="tr-stat-card tr-stat-success"><div class="tr-stat-label">Total Collected</div><div class="tr-stat-value">' + _trMoney(total) + '</div></div>'
+    +   '<div class="tr-stat-card tr-stat-info"><div class="tr-stat-label">Donations</div><div class="tr-stat-value">' + rows.length + '</div></div>'
+    +   '<div class="tr-stat-card tr-stat-warning"><div class="tr-stat-label">Unique Donors</div><div class="tr-stat-value">' + donorKeys.length + '</div></div>'
+    +   '<div class="tr-stat-card tr-stat-danger"><div class="tr-stat-label">Repeat Donors</div><div class="tr-stat-value">' + repeatCount + '</div></div>'
+    +   '<div class="tr-stat-card tr-stat-info"><div class="tr-stat-label">Average</div><div class="tr-stat-value">' + _trMoney(avg) + '</div></div>'
+    + '</div>'
+    + '</div>'
+    + '<div class="tr-panel-plain">'
+    +   '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">'
+    +     '<input class="search-bar" id="tr_counter_search" style="flex:1;min-width:180px;margin:0;" placeholder="🔍 Search donor, mobile or receipt..." value="' + _trEsc(trackerModuleState.counterSearch || '') + '" oninput="_trCounterSearch(this.value)" />'
+    +     '<button class="tr-btn tr-btn-secondary" style="padding:9px 14px;" onclick="_trExportCounterCsv()" title="Download the list below as CSV">⬇ Export CSV</button>'
+    +   '</div>'
+    +   '<div id="tr_counter_meta" style="font-size:12px;color:var(--tr-text-muted);margin-bottom:8px;"></div>'
+    +   '<div id="tr_counter_table" style="overflow-x:auto;"></div>'
+    + '</div>';
+
+  trackerModuleState.counterLimit = 100;
+  _trRenderCounterTable();
+}
+
+function _trCounterVisibleRows() {
+  const q = String(trackerModuleState.counterSearch || '').trim().toLowerCase();
+  const rows = trackerModuleState._counterRows || [];
+  if (!q) return rows;
+  const qDigits = q.replace(/\D/g, '');
+  return rows.filter(r =>
+    r.info.name.toLowerCase().indexOf(q) !== -1 ||
+    String(r.c.ReceiptID || '').toLowerCase().indexOf(q) !== -1 ||
+    (qDigits.length >= 3 && String(r.info.mobile || '').replace(/\D/g, '').indexOf(qDigits) !== -1));
+}
+
+function _trCounterSearch(v) {
+  trackerModuleState.counterSearch = v;
+  trackerModuleState.counterLimit = 100;
+  _trRenderCounterTable();
+}
+
+function _trCounterShowMore() {
+  trackerModuleState.counterLimit = (trackerModuleState.counterLimit || 100) + 100;
+  _trRenderCounterTable();
+}
+
+function _trRenderCounterTable() {
+  const box = document.getElementById('tr_counter_table');
+  const meta = document.getElementById('tr_counter_meta');
+  if (!box) return;
+  const visible = _trCounterVisibleRows();
+  const limit = trackerModuleState.counterLimit || 100;
+  const shown = visible.slice(0, limit);
+
+  if (meta) {
+    meta.textContent = visible.length === 0 ? '' :
+      'Showing ' + shown.length + ' of ' + visible.length + ' donation' + (visible.length === 1 ? '' : 's');
+  }
+  if (visible.length === 0) {
+    box.innerHTML = '<div style="padding:24px;text-align:center;color:var(--tr-text-faint);">No counter donations found for these filters.</div>';
+    return;
+  }
+
+  const th = 'padding:8px 10px;text-align:left;font-weight:600;color:var(--tr-text);white-space:nowrap;';
+  const td = 'padding:8px 10px;border-top:1px solid var(--tr-border);color:var(--tr-text);';
+  let html = '<table style="width:100%;border-collapse:collapse;font-size:12px;min-width:620px;">'
+    + '<tr style="background:var(--tr-surface-alt);">'
+    + '<th style="' + th + '">Date</th><th style="' + th + '">Donor</th><th style="' + th + '">Mobile</th>'
+    + '<th style="' + th + 'text-align:right;">Amount</th><th style="' + th + '">Type</th>'
+    + '<th style="' + th + '">Occasion</th><th style="' + th + '">Receipt</th></tr>';
+  shown.forEach(r => {
+    const badge = r.lifetime > 1
+      ? ' <span title="This donor has given ' + r.lifetime + ' times at the counter" style="background:var(--tr-warning-bg);color:var(--tr-warning-text);border-radius:10px;padding:1px 7px;font-size:10px;font-weight:700;white-space:nowrap;">Repeat ×' + r.lifetime + '</span>'
+      : '';
+    html += '<tr>'
+      + '<td style="' + td + 'white-space:nowrap;">' + _trEsc(r.c.PaymentDate || '—') + '</td>'
+      + '<td style="' + td + 'font-weight:500;">' + _trEsc(r.info.name) + badge + '</td>'
+      + '<td style="' + td + 'white-space:nowrap;">' + (_trEsc(r.info.mobile) || '—') + '</td>'
+      + '<td style="' + td + 'text-align:right;font-weight:600;white-space:nowrap;">' + _trMoney(r.amount) + '</td>'
+      + '<td style="' + td + '">' + _trEsc(_trTypeName(r.c)) + '</td>'
+      + '<td style="' + td + '">' + _trEsc(_trOccasionName(r.c)) + '</td>'
+      + '<td style="' + td + 'white-space:nowrap;">' + (_trEsc(r.c.ReceiptID) || '—') + '</td>'
+      + '</tr>';
+  });
+  html += '</table>';
+  if (visible.length > shown.length) {
+    html += '<div style="text-align:center;margin-top:12px;"><button class="tr-btn tr-btn-secondary" style="padding:9px 18px;" onclick="_trCounterShowMore()">Show more</button></div>';
+  }
+  box.innerHTML = html;
+}
+
+// CSV cell: quoted, and neutralised if it could be run as a spreadsheet formula
+// (donor names / notes are typed by hand). Phone numbers like "+91 98..." are left alone.
+function _trCsvCell(v, isPhone) {
+  let s = String(v === undefined || v === null ? '' : v);
+  const looksLikePhone = isPhone && /^\+?[0-9][0-9 \-]*$/.test(s);
+  if (!looksLikePhone && /^[=+\-@\t\r]/.test(s)) s = "'" + s;
+  return '"' + s.replace(/"/g, '""') + '"';
+}
+
+function _trExportCounterCsv() {
+  const rows = _trCounterVisibleRows();
+  if (!rows.length) { if (typeof toast === 'function') toast('No counter donations to export'); return; }
+  const header = ['Date', 'Donor Name', 'Mobile', 'Amount', 'Type', 'Occasion', 'For Month', 'Year', 'Receipt ID', 'Purpose / Note', 'Times Donated (all years)'];
+  const lines = [header.map(h => _trCsvCell(h)).join(',')];
+  rows.forEach(r => {
+    lines.push([
+      _trCsvCell(r.c.PaymentDate || ''),
+      _trCsvCell(r.info.name),
+      _trCsvCell(r.info.mobile, true),
+      _trCsvCell(r.amount),
+      _trCsvCell(_trTypeName(r.c)),
+      _trCsvCell(_trOccasionName(r.c)),
+      _trCsvCell(r.c.ForMonth || ''),
+      _trCsvCell(r.c.Year || ''),
+      _trCsvCell(r.c.ReceiptID || ''),
+      _trCsvCell(r.info.purpose),
+      _trCsvCell(r.lifetime)
+    ].join(','));
+  });
+  const monthVal = document.getElementById('tr_month_select_global')?.value || '';
+  const fname = 'counter-donors-' + trackerModuleState.filters.year + '-' + (monthVal || 'all') + '.csv';
+  // BOM so Excel reads ₹ and Hindi names correctly
+  const blob = new Blob(['\uFEFF' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = fname;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
 // ═══ ANALYTICS ═══

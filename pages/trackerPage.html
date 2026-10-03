@@ -78,6 +78,7 @@
       <button class="wave-tab tracker-tab-btn" data-color="#C1440E" onclick="switchTrackerTab('analytics', this)"><span class="tr-tab-icon">📈</span>Analytics</button>
       <button class="wave-tab tracker-tab-btn" data-color="#C1440E" onclick="switchTrackerTab('email', this)"><span class="tr-tab-icon">📧</span>Email</button>
       <button class="wave-tab tracker-tab-btn" data-color="#C1440E" onclick="switchTrackerTab('calendar', this)"><span class="tr-tab-icon">📅</span>Calendar</button>
+      <button class="wave-tab tracker-tab-btn" data-color="#C1440E" onclick="switchTrackerTab('counter', this)"><span class="tr-tab-icon">🪙</span>Counter</button>
       <button class="wave-tab tracker-tab-btn" data-color="#C1440E" onclick="switchTrackerTab('leaderboard', this)"><span class="tr-tab-icon">🏆</span>Leaders</button>
       <button class="wave-tab tracker-tab-btn" data-color="#C1440E" onclick="switchTrackerTab('predictions', this)"><span class="tr-tab-icon">🤖</span>Predict</button>
     </div>
@@ -184,6 +185,11 @@
     <!-- TAB 4: CALENDAR -->
     <div id="tracker-tab-calendar" style="display:none;">
       <div id="tracker_calendar_content"></div>
+    </div>
+
+    <!-- TAB: COUNTER DONORS (walk-in donors - no member account) -->
+    <div id="tracker-tab-counter" style="display:none;">
+      <div id="tracker_counter_content"></div>
     </div>
 
     <!-- TAB 5: LEADERBOARD -->
