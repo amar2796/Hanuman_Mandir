@@ -1821,7 +1821,9 @@ function _buildAdminSummaryPdfHtml(data) {
       // Two side-by-side columns, each with its own header. The paid/not-paid dot is dropped here:
       // "Not Paid" + the pink row already say it.
       const items = [];
-      data.paidList.forEach(m => items.push({ name: m.name, date: m.dateDisplay || "", amount: m.amount, entries: m.entries, paid: true }));
+      // several entries in a month arrive as "05 Sep, 12 Sep, 20 Sep" (too wide for this narrow column): show the latest date;
+      // the "×3" next to the amount already says there is more than one entry.
+      data.paidList.forEach(m => items.push({ name: m.name, date: String(m.dateDisplay || "").split(", ").pop(), amount: m.amount, entries: m.entries, paid: true }));
       data.unpaidList.forEach(m => items.push({ name: m.name, paid: false }));
       const nW = numW(nMembers);
       table = twoCols(items, function(list, offset) {
