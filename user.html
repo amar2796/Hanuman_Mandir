@@ -187,7 +187,7 @@
           <div class="hdr-drop-item" onclick="closeDropdown();openEditProfileDirect()" role="menuitem" tabindex="0" onkeydown="if(event.key==='Enter'){closeDropdown();openEditProfileDirect();}">
             <i class="fa-solid fa-pen-to-square"></i> Edit Profile
           </div>
-          <div class="hdr-drop-item" id="hdr_idcard_btn" onclick="closeDropdown();_btnLoad(this);downloadMemberIDCard().finally(()=>_btnDone(document.getElementById('hdr_idcard_btn')))" role="menuitem" tabindex="0" onkeydown="if(event.key==='Enter'){closeDropdown();_btnLoad(this);downloadMemberIDCard().finally(()=>_btnDone(document.getElementById('hdr_idcard_btn')));}">
+          <div class="hdr-drop-item" id="hdr_idcard_btn" onclick="closeDropdown();_confirmIdCardDownload()" role="menuitem" tabindex="0" onkeydown="if(event.key==='Enter'){closeDropdown();_confirmIdCardDownload();}">
             <i class="fa-solid fa-address-card"></i> ID Card
           </div>
           <div class="hdr-drop-item danger" onclick="logout()" role="menuitem" tabindex="0" onkeydown="if(event.key==='Enter'){logout();}">

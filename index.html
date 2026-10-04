@@ -4,8 +4,43 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-    <title id="pageTitle">Mandir System</title>
-    <meta name="description" id="metaDesc" content="Temple management system — contributions, expenses, members and more."/>
+    <!-- Real title / description / link-preview tags live in the HTML itself (not only in JS)
+         because Google, WhatsApp and Facebook read the raw HTML. Keep in sync with constants.js. -->
+    <title id="pageTitle">Shree Hanuman Mandir, Paliya, Sultanpur</title>
+    <meta name="description" id="metaDesc" content="Shree Hanuman Mandir, Paliya, Sultanpur (Uttar Pradesh) — visit the mandir, get directions and contact details, meet the members and stay connected with temple activities."/>
+    <meta name="theme-color" content="#7A1F1F" />
+    <link rel="canonical" href="https://amar2796.github.io/Hanuman_Mandir/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Shree Hanuman Mandir" />
+    <meta property="og:title" content="Shree Hanuman Mandir, Paliya, Sultanpur" />
+    <meta property="og:description" content="Visit the mandir, get directions and contact details, meet the members and stay connected with temple activities. Jai Shree Ram 🙏" />
+    <meta property="og:url" content="https://amar2796.github.io/Hanuman_Mandir/" />
+    <meta property="og:image" content="https://amar2796.github.io/Hanuman_Mandir/Image/logo.PNG" />
+    <meta property="og:image:alt" content="Shree Hanuman Mandir logo" />
+    <meta property="og:locale" content="en_IN" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="Shree Hanuman Mandir, Paliya, Sultanpur" />
+    <meta name="twitter:description" content="Visit the mandir, get directions and contact details, meet the members and stay connected with temple activities." />
+    <meta name="twitter:image" content="https://amar2796.github.io/Hanuman_Mandir/Image/logo.PNG" />
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "HinduTemple",
+      "name": "Shree Hanuman Mandir",
+      "alternateName": "श्री हनुमान मंदिर",
+      "url": "https://amar2796.github.io/Hanuman_Mandir/",
+      "image": "https://amar2796.github.io/Hanuman_Mandir/Image/logo.PNG",
+      "telephone": "+918127991402",
+      "email": "hanumanmandirpaliya@gmail.com",
+      "address": {
+        "@type": "PostalAddress",
+        "addressLocality": "Paliya",
+        "addressRegion": "Uttar Pradesh",
+        "addressCountry": "IN"
+      },
+      "geo": { "@type": "GeoCoordinates", "latitude": 26.321060585267084, "longitude": 82.20519597492734 }
+    }
+    </script>
     <link rel="icon" type="image/png" href="Image/logo.PNG">
     <link rel="apple-touch-icon" href="Image/logo.PNG">
     <link rel="preload" as="image" href="Image/Background_pic.webp" type="image/webp" fetchpriority="high">
@@ -25,10 +60,13 @@
     <link rel="stylesheet" href="design-system-v2.css">
     <link rel="stylesheet" href="components-v2.css">
     <link rel="stylesheet" href="index.css">
+    <!-- If JavaScript is off/blocked, show the scroll-reveal sections instead of leaving them invisible -->
+    <noscript><style>.reveal{opacity:1!important;transform:none!important}#splash-screen{display:none!important}</style></noscript>
   </head>
   <body>
+    <a class="skip-link" href="#main">Skip to main content</a>
     <div id="splash-screen">
-      <h1 class="splash-text" id="splashText">…</h1>
+      <div class="splash-text" id="splashText" role="presentation">…</div>
     </div>
 
     <audio id="bgMusic" src="jai-shree-ram.mp3"></audio>
@@ -78,6 +116,7 @@
           <!-- FINANCES NAV LINK — disabled until Temple Finances section is re-enabled
           <a href="#financesSection">Finances</a>
           -->
+          <a href="#visitSection">Visit</a>
           <a href="#feedbackSection">Feedback</a>
          
         </nav>
@@ -114,6 +153,10 @@
         <i class="fa-solid fa-images"></i> 
         Gallery</a
       >
+      <a href="#visitSection" onclick="closeNavMenu()">
+        <i class="fa-solid fa-location-dot"></i>
+        Visit</a
+      >
       <a href="#feedbackSection" onclick="closeNavMenu()">
         <i class="fa-solid fa-comment-dots"></i> 
         Feedback</a
@@ -132,6 +175,7 @@
       >
     </div>
 
+    <main id="main" tabindex="-1">
     <div class="hero" id="hero">
       <div class="hero-box">
         <h1 id="heroHeading">|| श्री हनुमत आश्रम ||<span id="heroSub">राम जग विश्‍वकर्मा</span></h1>
@@ -272,7 +316,7 @@
       <!-- Member 2 -->
       <div class="member-card" id="memberCard2">
         <div class="member-photo-side">
-          <img class="member-avatar" src="Image/RamJag.webp" alt="Ambika Prasad Singh" 
+          <img class="member-avatar" src="Image/RamJag.webp" alt="Ram Jag Vishwakarma" 
             onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
           <div class="member-photo-overlay"></div>
         </div>
@@ -415,14 +459,14 @@
         <!-- Top bar always visible -->
         <div class="gc-lb-topbar">
           <span class="gc-lb-counter" id="gcLbCounter"></span>
-          <button class="gc-lightbox-close" onclick="closeLightbox()"><i class="fa-solid fa-xmark"></i></button>
+          <button class="gc-lightbox-close" onclick="closeLightbox()" aria-label="Close photo"><i class="fa-solid fa-xmark"></i></button>
         </div>
         <!-- Image panel — clicking the panel bg closes; clicking the frame/img does NOT -->
         <div class="gc-lb-panel" id="gcLbPanel">
           <div class="gc-lb-frame" id="gcLbFrame">
             <img id="gcLightboxImg" src="" alt="">
-            <button class="gc-lb-prev" onclick="event.stopPropagation();lbNav(-1)"><i class="fa-solid fa-chevron-left"></i></button>
-            <button class="gc-lb-next" onclick="event.stopPropagation();lbNav(1)"><i class="fa-solid fa-chevron-right"></i></button>
+            <button class="gc-lb-prev" onclick="event.stopPropagation();lbNav(-1)" aria-label="Previous photo"><i class="fa-solid fa-chevron-left"></i></button>
+            <button class="gc-lb-next" onclick="event.stopPropagation();lbNav(1)" aria-label="Next photo"><i class="fa-solid fa-chevron-right"></i></button>
           </div>
           <div id="gcLbCaption" style="display:none;"></div>
         </div>
@@ -529,6 +573,60 @@
     </div>
     ══ END TEMPLE FINANCES HTML ══ -->
 
+    <!-- ══ VISIT THE MANDIR — filled from APP in constants.js (index.js: initVisitSection) ══ -->
+    <div class="section-divider reveal">
+      <div class="sd-line"></div>
+      <div class="sd-center">
+        <div class="sd-petal"></div>
+        <div class="sd-dot"></div>
+        <div class="sd-symbol">🔔</div>
+        <div class="sd-dot"></div>
+        <div class="sd-petal"></div>
+      </div>
+      <div class="sd-line"></div>
+    </div>
+
+    <div class="section reveal" id="visitSection">
+      <h2>Visit the Mandir</h2>
+      <p>Come for darshan, join the community, or reach us for any seva or donation query. 🙏</p>
+      <div class="visit-grid">
+        <div class="visit-card" id="visitAddressCard">
+          <div class="visit-icon"><i class="fa-solid fa-location-dot"></i></div>
+          <div class="visit-label">Address</div>
+          <div class="visit-value" id="visitAddress">…</div>
+          <a class="visit-btn" id="visitDirections" href="#" target="_blank" rel="noopener noreferrer">
+            <i class="fa-solid fa-diamond-turn-right"></i> Get Directions
+          </a>
+        </div>
+        <div class="visit-card" id="visitCallCard">
+          <div class="visit-icon"><i class="fa-solid fa-phone"></i></div>
+          <div class="visit-label">Call Us</div>
+          <div class="visit-value" id="visitPhone">…</div>
+          <a class="visit-btn" id="visitCallBtn" href="#"><i class="fa-solid fa-phone"></i> Call Now</a>
+        </div>
+        <div class="visit-card" id="visitWhatsappCard">
+          <div class="visit-icon is-whatsapp"><i class="fa-brands fa-whatsapp"></i></div>
+          <div class="visit-label">WhatsApp</div>
+          <div class="visit-value">Message us anytime</div>
+          <a class="visit-btn is-whatsapp" id="visitWhatsappBtn" href="#" target="_blank" rel="noopener noreferrer">
+            <i class="fa-brands fa-whatsapp"></i> Chat on WhatsApp
+          </a>
+        </div>
+        <div class="visit-card" id="visitEmailCard">
+          <div class="visit-icon"><i class="fa-solid fa-envelope"></i></div>
+          <div class="visit-label">Email</div>
+          <div class="visit-value" id="visitEmail">…</div>
+          <a class="visit-btn" id="visitEmailBtn" href="#"><i class="fa-solid fa-envelope"></i> Send Email</a>
+        </div>
+        <!-- Shown only when APP.timings in constants.js has rows -->
+        <div class="visit-card visit-timings" id="visitTimingsCard" style="display:none;">
+          <div class="visit-icon"><i class="fa-regular fa-clock"></i></div>
+          <div class="visit-label">Darshan &amp; Aarti Timings</div>
+          <ul id="visitTimings"></ul>
+        </div>
+      </div>
+    </div>
+
     <div class="section-divider reveal">
       <div class="sd-line"></div>
       <div class="sd-center">
@@ -609,6 +707,8 @@
       </div>
     </div>
 
+    </main>
+
     <div class="footer" id="pageFooter">
       © 2026 Mandir System | Built with <span>❤️</span>
       <span class="footer-tagline" id="footerTagline">…</span>
@@ -636,7 +736,7 @@
         // Page title & meta description
         document.title = name + (loc ? ', ' + loc : '');
         var md = document.getElementById('metaDesc');
-        if (md) md.setAttribute('content', name + ' — temple management system for contributions, expenses, and members.');
+        if (md) md.setAttribute('content', name + (loc ? ', ' + loc : '') + ' — visit the mandir, get directions and contact details, meet the members and stay connected with temple activities.');
 
         // Splash screen
         var sp = document.getElementById('splashText');

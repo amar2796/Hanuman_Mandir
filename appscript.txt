@@ -1654,6 +1654,50 @@ function _buildAdminSummaryPdfHtml(data) {
   }
   const BORDER = "1px solid #E8E4DC";
 
+  // ── ONE-PAGE FIT ───────────────────────────────────────────────────────
+  // The PNG is page 1 of this PDF, so the whole summary must sit on ONE A4 page.
+  // The layout therefore picks its own density from the amount of data: it takes the
+  // roomiest of the layouts below whose estimated height fits the page.
+  //   0 = comfortable rows (the original look)
+  //   1 = tighter rows
+  //   2 = tighter rows + slimmer header
+  //   3, 4, 5 = smallest rows (emergency: many members AND many counter / expense entries; text ends up about 6-7pt)
+  // EACH of the three lists (members, Donation Counter, Expenses) is shown in ONE column until it has
+  // more than `split` entries, then it is split into TWO side-by-side columns (first half | second half).
+  // `split` is 20 in the roomiest layout and gets lower as the layouts get tighter.
+  // mRow / oRow = member / expense+counter row height (px); hRow / oHead = their header rows.
+  // base, eChrome, wChrome = measured
+  // heights of the fixed parts (page header + cards + footer, the Expenses card frame, the
+  // Counter card frame). They only need re-measuring if you change the layout CSS below.
+  const TIERS = [
+    { split: 20, mRow: 26, oRow: 24, hRow: 26, oHead: 24, thFs: 10,  fs: 12.5, fsS: 11.5, dot: 14, compact: false, base: 334, eChrome: 91, wChrome: 91 },
+    { split: 12, mRow: 24, oRow: 24, hRow: 24, oHead: 24, thFs: 9.5, fs: 12,   fsS: 11,   dot: 12, compact: false, base: 332, eChrome: 91, wChrome: 91 },
+    { split: 8,  mRow: 20, oRow: 20, hRow: 20, oHead: 20, thFs: 9.5, fs: 11,   fsS: 10,   dot: 11, compact: true,  base: 259, eChrome: 70, wChrome: 70 },
+    { split: 6,  mRow: 17, oRow: 17, hRow: 18, oHead: 18, thFs: 9,   fs: 10,   fsS: 9,    dot: 10, compact: true,  base: 257, eChrome: 68, wChrome: 68 },
+    { split: 6,  mRow: 15, oRow: 15, hRow: 16, oHead: 16, thFs: 8.5, fs: 9,    fsS: 8.5,  dot: 9,  compact: true,  base: 255, eChrome: 66, wChrome: 66 },
+    { split: 6,  mRow: 13, oRow: 13, hRow: 14, oHead: 14, thFs: 8,   fs: 8,    fsS: 7.5,  dot: 8,  compact: true,  base: 253, eChrome: 64, wChrome: 64 }
+  ];
+  const AVAIL = 1000;   // usable px on one A4 page (1026) minus a safety margin
+  const nMembers = data.paidList.length + data.unpaidList.length;
+  const nExp = expenseList.length, nWalk = walkinList.length;
+  const colsOf = (T, n) => n > T.split ? 2 : 1;
+  function estimate(T) {
+    const rowsOf = n => Math.ceil(n / colsOf(T, n));
+    return T.base + rowsOf(nMembers) * T.mRow +
+           (nExp  ? T.eChrome + rowsOf(nExp)  * T.oRow : 0) +
+           (nWalk ? T.wChrome + rowsOf(nWalk) * T.oRow : 0);
+  }
+  let tier = 0;
+  while (tier < TIERS.length - 1 && estimate(TIERS[tier]) > AVAIL) tier++;
+  if (data.densityTier !== undefined) tier = Number(data.densityTier);   // test hook: force a layout
+  const T = TIERS[tier], K = T.compact;
+
+  // ── layout numbers that change with density (tier 0 = exactly the original look) ──
+  const V = K ? { bodyPad: 8,  titleFs: 17, titlePb: 4, subMt: 3, progMt: 9,  progPad: "9px 14px",  barH: 10, barR: 5, progFs1: 12,   progFs2: 13.5,
+                  statMt: 9,  statPad: "5px 6px", statFs1: 8.5, statFs2: 13, cardMt: 10, cardPad: "9px 14px",  cardTitleFs: 13, cardTitleH: 15, ctMb: 2, ctMbO: 5, footMt: 10, inner: 604 }
+              : { bodyPad: 12, titleFs: 20, titlePb: 6, subMt: 5, progMt: 13, progPad: "14px 18px", barH: 14, barR: 7, progFs1: 13,   progFs2: 14.5,
+                  statMt: 15, statPad: "8px 6px", statFs1: 9.5, statFs2: 15, cardMt: 14, cardPad: "13px 18px", cardTitleFs: 14, cardTitleH: 16, ctMb: 3, ctMbO: 9, footMt: 16, inner: 596 };
+
   // One table cell (fixed width, single line, "…" if a long name doesn't fit)
   function cell(w, padX, align, html, extra) {
     return "<div style='width:" + w + "px;flex:none;box-sizing:border-box;padding:0 " + padX + "px;" +
@@ -1670,37 +1714,46 @@ function _buildAdminSummaryPdfHtml(data) {
   function th(w, padX, align, label, color, size) {
     return cell(w, padX, align, label, "font-size:" + size + "px;font-weight:700;color:" + color + ";");
   }
+  // Two side-by-side columns: first half | second half. makeHalf(sub, offset) builds one half (width colW).
+  const colW = (V.inner - 16) / 2;
+  const numW = n => Math.ceil(String(n).length * 6.5) + 12;                      // room for the longest row number
+  const amtWidth = (chars, minW, maxW) => Math.min(Math.max(minW, Math.ceil(chars * T.fs * 0.6) + 12), maxW);
+  function twoCols(list, makeHalf) {
+    const half = Math.ceil(list.length / 2);
+    return "<div style='display:flex;justify-content:space-between;align-items:flex-start;'>" +
+             makeHalf(list.slice(0, half), 0) + makeHalf(list.slice(half), half) + "</div>";
+  }
 
   // ── Header ──
   const header =
-    "<div style='text-align:center;font-size:20px;font-weight:800;color:#5C1717;padding-bottom:6px;border-bottom:" + BORDER + ";'>" + esc(CFG.name) + "</div>" +
-    "<div style='text-align:center;font-size:11.5px;color:#64748b;margin:5px 0 0;'>" + esc(data.month) + " " + esc(data.year) + " &middot; Contribution Summary</div>";
+    "<div style='text-align:center;font-size:" + V.titleFs + "px;font-weight:800;color:#5C1717;padding-bottom:" + V.titlePb + "px;border-bottom:" + BORDER + ";'>" + esc(CFG.name) + "</div>" +
+    "<div style='text-align:center;font-size:11.5px;color:#64748b;margin:" + V.subMt + "px 0 0;'>" + esc(data.month) + " " + esc(data.year) + " &middot; Contribution Summary</div>";
 
   // ── Collection progress card ──
-  const totalMembers = data.paidList.length + data.unpaidList.length;
+  const totalMembers = nMembers;
   const pct = totalMembers > 0 ? Math.round((data.paidList.length / totalMembers) * 100) : 0;
   const progressCard =
-    "<div style='margin-top:13px;padding:14px 18px;border-radius:10px;" + fill("#FDF0E6") + "'>" +
+    "<div style='margin-top:" + V.progMt + "px;padding:" + V.progPad + ";border-radius:10px;" + fill("#FDF0E6") + "'>" +
       "<div style='display:flex;justify-content:space-between;align-items:baseline;'>" +
-        "<div style='font-size:13px;font-weight:700;color:#5C1717;'>Collection Progress</div>" +
-        "<div style='font-size:14.5px;font-weight:800;color:" + ACCENT + ";'>" + pct + "% &middot; " + data.paidList.length + "/" + totalMembers + " paid</div>" +
+        "<div style='font-size:" + V.progFs1 + "px;font-weight:700;color:#5C1717;'>Collection Progress</div>" +
+        "<div style='font-size:" + V.progFs2 + "px;font-weight:800;color:" + ACCENT + ";'>" + pct + "% &middot; " + data.paidList.length + "/" + totalMembers + " paid</div>" +
       "</div>" +
-      "<div style='margin-top:8px;height:14px;border-radius:7px;overflow:hidden;" + fill("#F2D9C4") + "'>" +
-        "<div style='width:" + pct + "%;height:14px;" + fill(ACCENT) + "'></div>" +
+      "<div style='margin-top:8px;height:" + V.barH + "px;border-radius:" + V.barR + "px;overflow:hidden;" + fill("#F2D9C4") + "'>" +
+        "<div style='width:" + pct + "%;height:" + V.barH + "px;" + fill(ACCENT) + "'></div>" +
       "</div>" +
     "</div>";
 
   // ── Stat box: Collected / Expenses / Net Balance ──
   function miniStat(label, value, color) {
-    return "<td style='padding:8px 6px;text-align:center;'>" +
-      "<div style='font-size:9.5px;color:#94A0A6;font-weight:700;text-transform:uppercase;'>" + label + "</div>" +
-      "<div style='font-size:15px;font-weight:800;color:" + color + ";margin-top:3px;'>" + CUR + " " + _admFormatINR(value || 0) + "</div>" +
+    return "<td style='padding:" + V.statPad + ";text-align:center;'>" +
+      "<div style='font-size:" + V.statFs1 + "px;color:#94A0A6;font-weight:700;text-transform:uppercase;'>" + label + "</div>" +
+      "<div style='font-size:" + V.statFs2 + "px;font-weight:800;color:" + color + ";margin-top:3px;'>" + CUR + " " + _admFormatINR(value || 0) + "</div>" +
     "</td>";
   }
   const collectedForStat = hasWalkin ? (data.grandTotal != null ? data.grandTotal : data.totalCollected) : data.totalCollected;
   const netForStat = data.netBalance != null ? data.netBalance : collectedForStat;
   const statsRow =
-    "<div style='margin-top:15px;border:" + BORDER + ";border-radius:10px;'>" +
+    "<div style='margin-top:" + V.statMt + "px;border:" + BORDER + ";border-radius:10px;'>" +
       "<table width='100%' cellpadding='0' cellspacing='0' style='border-collapse:separate;border-spacing:0;'><tr>" +
         miniStat("Collected", collectedForStat, "#16a34a") +
         miniStat("Expenses", data.expenseTotal, "#dc2626") +
@@ -1709,103 +1762,193 @@ function _buildAdminSummaryPdfHtml(data) {
     "</div>";
 
   // ── Card wrapper used by the big sections ──
-  function card(inner, bg) {
-    return "<div style='margin-top:14px;padding:13px 18px;border:" + BORDER + ";border-radius:10px;break-inside:avoid;page-break-inside:avoid;" + (bg ? fill(bg) : "") + "'>" + inner + "</div>";
+  // Cards are kept in one piece (break-inside:avoid). Only when even the tightest layout cannot fit
+  // one page (roughly 65+ members) is the Payment Status card allowed to continue on page 2 —
+  // otherwise it would jump there whole and leave page 1 (the PNG) holding only the header.
+  const overflow = estimate(TIERS[TIERS.length - 1]) > AVAIL;
+  function card(inner, bg, allowSplit) {
+    const brk = (allowSplit && overflow) ? "break-inside:auto;" : "break-inside:avoid;page-break-inside:avoid;";
+    return "<div style='margin-top:" + V.cardMt + "px;padding:" + V.cardPad + ";border:" + BORDER + ";border-radius:10px;" + brk + (bg ? fill(bg) : "") + "'>" + inner + "</div>";
   }
   function cardTitle(html, color, mb) {
-    return "<div style='font-size:14px;font-weight:700;color:" + color + ";height:16px;line-height:16px;margin-bottom:" + mb + "px;'>" + html + "</div>";
+    return "<div style='font-size:" + V.cardTitleFs + "px;font-weight:700;color:" + color + ";height:" + V.cardTitleH + "px;line-height:" + V.cardTitleH + "px;margin-bottom:" + mb + "px;'>" + html + "</div>";
   }
 
   // ── Payment Status ──
-  // Column widths (px) add up to 596 = card inner width. "Entries" column only appears
-  // when at least one member has more than one entry this month (unchanged behaviour).
-  const anyMultiEntry = data.paidList.some(m => m.entries > 1);
-  const PC = anyMultiEntry ? [53, 235, 97, 62, 103, 46] : [53, 277, 97, 124, 45];
-  let memberRows = "";
-  let mi = 0;
-  data.paidList.forEach(m => {
-    mi++;
-    const bg = mi % 2 === 0 ? "#FBF5EC" : "";
-    let c = cell(PC[0], 8, "left", mi, "font-size:11.5px;color:#D6D0C4;") +
-            cell(PC[1], 8, "left", esc(m.name), "font-size:12.5px;") +
-            cell(PC[2], 8, "center", esc(m.dateDisplay || ""), "font-size:11.5px;color:#64748b;");
-    if (anyMultiEntry) {
-      c += cell(PC[3], 8, "center", m.entries > 1 ? m.entries : "", "font-size:11.5px;color:#64748b;");
-    }
-    c += cell(PC[anyMultiEntry ? 4 : 3], 8, "right", CUR + " " + m.amount, "font-size:12.5px;font-weight:700;") +
-         cell(PC[anyMultiEntry ? 5 : 4], 0, "center", "&#9679;", "font-size:14px;color:#16a34a;");
-    memberRows += row(26, bg, c);
-  });
-  data.unpaidList.forEach(m => {
-    mi++;
-    let c = cell(PC[0], 8, "left", mi, "font-size:11.5px;color:#f3b4b4;") +
-            cell(PC[1], 8, "left", esc(m.name), "font-size:12.5px;color:#b91c1c;font-weight:700;") +
-            cell(PC[2], 8, "center", "&mdash;", "font-size:11.5px;color:#f3b4b4;");
-    if (anyMultiEntry) c += cell(PC[3], 8, "center", "", "");
-    c += cell(PC[anyMultiEntry ? 4 : 3], 8, "right", "Not Paid", "font-size:12.5px;color:#dc2626;font-weight:700;") +
-         cell(PC[anyMultiEntry ? 5 : 4], 0, "center", "&#9679;", "font-size:14px;color:#dc2626;");
-    memberRows += row(26, "#FDE6E6", c);
-  });
-
   let sections = "";
-  if (data.paidList.length > 0 || data.unpaidList.length > 0) {
-    const head = headRow(26, ACCENT,
-      th(PC[0], 8, "left", "#", ACCENT, 10) +
-      th(PC[1], 8, "left", "NAME", ACCENT, 10) +
-      th(PC[2], 8, "center", "DATE", ACCENT, 10) +
-      (anyMultiEntry ? th(PC[3], 8, "center", "ENTRIES", ACCENT, 10) : "") +
-      th(PC[anyMultiEntry ? 4 : 3], 8, "right", "AMOUNT", ACCENT, 10) +
-      th(PC[anyMultiEntry ? 5 : 4], 0, "center", "&nbsp;", ACCENT, 10));
-    sections += card(cardTitle("Payment Status", "#5C1717", 3) + head + memberRows);
+  if (nMembers > 0) {
+    let table = "";
+    if (colsOf(T, nMembers) === 1) {
+      // Column widths (px) add up to the card's inner width (596 in the original look). "Entries" column only
+      // appears when at least one member has more than one entry this month (unchanged behaviour).
+      const anyMultiEntry = data.paidList.some(m => m.entries > 1);
+      const PC = anyMultiEntry ? [53, 235, 97, 62, 103, 46] : [53, 277, 97, 124, 45];
+      PC[1] += V.inner - 596;
+      let memberRows = "";
+      let mi = 0;
+      data.paidList.forEach(m => {
+        mi++;
+        const bg = mi % 2 === 0 ? "#FBF5EC" : "";
+        let c = cell(PC[0], 8, "left", mi, "font-size:" + T.fsS + "px;color:#D6D0C4;") +
+                cell(PC[1], 8, "left", esc(m.name), "font-size:" + T.fs + "px;") +
+                cell(PC[2], 8, "center", esc(m.dateDisplay || ""), "font-size:" + T.fsS + "px;color:#64748b;");
+        if (anyMultiEntry) {
+          c += cell(PC[3], 8, "center", m.entries > 1 ? m.entries : "", "font-size:" + T.fsS + "px;color:#64748b;");
+        }
+        c += cell(PC[anyMultiEntry ? 4 : 3], 8, "right", CUR + " " + m.amount, "font-size:" + T.fs + "px;font-weight:700;") +
+             cell(PC[anyMultiEntry ? 5 : 4], 0, "center", "&#9679;", "font-size:" + T.dot + "px;color:#16a34a;");
+        memberRows += row(T.mRow, bg, c);
+      });
+      data.unpaidList.forEach(m => {
+        mi++;
+        let c = cell(PC[0], 8, "left", mi, "font-size:" + T.fsS + "px;color:#f3b4b4;") +
+                cell(PC[1], 8, "left", esc(m.name), "font-size:" + T.fs + "px;color:#b91c1c;font-weight:700;") +
+                cell(PC[2], 8, "center", "&mdash;", "font-size:" + T.fsS + "px;color:#f3b4b4;");
+        if (anyMultiEntry) c += cell(PC[3], 8, "center", "", "");
+        c += cell(PC[anyMultiEntry ? 4 : 3], 8, "right", "Not Paid", "font-size:" + T.fs + "px;color:#dc2626;font-weight:700;") +
+             cell(PC[anyMultiEntry ? 5 : 4], 0, "center", "&#9679;", "font-size:" + T.dot + "px;color:#dc2626;");
+        memberRows += row(T.mRow, "#FDE6E6", c);
+      });
+      const head = headRow(T.hRow, ACCENT,
+        th(PC[0], 8, "left", "#", ACCENT, T.thFs) +
+        th(PC[1], 8, "left", "NAME", ACCENT, T.thFs) +
+        th(PC[2], 8, "center", "DATE", ACCENT, T.thFs) +
+        (anyMultiEntry ? th(PC[3], 8, "center", "ENTRIES", ACCENT, T.thFs) : "") +
+        th(PC[anyMultiEntry ? 4 : 3], 8, "right", "AMOUNT", ACCENT, T.thFs) +
+        th(PC[anyMultiEntry ? 5 : 4], 0, "center", "&nbsp;", ACCENT, T.thFs));
+      table = head + memberRows;
+    } else {
+      // Two side-by-side columns, each with its own header. The paid/not-paid dot is dropped here:
+      // "Not Paid" + the pink row already say it.
+      const items = [];
+      data.paidList.forEach(m => items.push({ name: m.name, date: m.dateDisplay || "", amount: m.amount, entries: m.entries, paid: true }));
+      data.unpaidList.forEach(m => items.push({ name: m.name, paid: false }));
+      const nW = numW(nMembers);
+      table = twoCols(items, function(list, offset) {
+        // Amount column is sized from THIS half's data (a 5-digit amount or "×2" needs more room than
+        // "Rs. 1000"); the name column gets the rest, so one wide amount never squeezes the other half.
+        let amtChars = 8;   // "Not Paid"
+        list.forEach(m => { if (m.paid) amtChars = Math.max(amtChars, String(CUR + " " + m.amount).length + (m.entries > 1 ? 3 : 0)); });
+        const aW = amtWidth(amtChars, 66, colW - nW - 50 - 100);
+        const CW = [nW, colW - nW - 50 - aW, 50, aW];
+        const head = headRow(T.hRow, ACCENT,
+          th(CW[0], 6, "left", "#", ACCENT, T.thFs) + th(CW[1], 6, "left", "NAME", ACCENT, T.thFs) +
+          th(CW[2], 6, "center", "DATE", ACCENT, T.thFs) + th(CW[3], 6, "right", "AMOUNT", ACCENT, T.thFs));
+        const rows = list.map((m, i) => {
+          const num = offset + i + 1;
+          if (m.paid) {
+            const multi = m.entries > 1 ? " <span style='font-weight:400;color:#64748b;font-size:" + T.fsS + "px;'>&times;" + m.entries + "</span>" : "";
+            return row(T.mRow, i % 2 === 1 ? "#FBF5EC" : "",
+              cell(CW[0], 6, "left", num, "font-size:" + T.fsS + "px;color:#D6D0C4;") +
+              cell(CW[1], 6, "left", esc(m.name), "font-size:" + T.fs + "px;") +
+              cell(CW[2], 6, "center", esc(m.date), "font-size:" + T.fsS + "px;color:#64748b;") +
+              cell(CW[3], 6, "right", CUR + " " + m.amount + multi, "font-size:" + T.fs + "px;font-weight:700;"));
+          }
+          return row(T.mRow, "#FDE6E6",
+            cell(CW[0], 6, "left", num, "font-size:" + T.fsS + "px;color:#f3b4b4;") +
+            cell(CW[1], 6, "left", esc(m.name), "font-size:" + T.fs + "px;color:#b91c1c;font-weight:700;") +
+            cell(CW[2], 6, "center", "&mdash;", "font-size:" + T.fsS + "px;color:#f3b4b4;") +
+            cell(CW[3], 6, "right", "Not Paid", "font-size:" + T.fs + "px;color:#dc2626;font-weight:700;"));
+        }).join("");
+        return "<div style='width:" + colW + "px;'>" + head + rows + "</div>";
+      });
+    }
+    sections += card(cardTitle("Payment Status", "#5C1717", V.ctMb) + table, "", true);
   }
+
+  // table widths for the single-column Counter / Expenses cards (they follow the card's inner width)
+  const extra = V.inner - 596;
 
   // ── Walk-in contributions (amber version of the same card) ──
   if (hasWalkin) {
-    const WC = [32, 468, 96];
-    const wRows = walkinList.map((m, i) =>
-      row(24, i % 2 === 1 ? "#fffbeb" : "",
-        cell(WC[0], 8, "left", i + 1, "font-size:11.5px;color:#D6D0C4;") +
-        cell(WC[1], 8, "left", esc(m.name), "font-size:12.5px;") +
-        cell(WC[2], 8, "right", CUR + " " + m.amount, "font-size:12.5px;font-weight:700;"))
-    ).join("");
-    const wHead = headRow(24, "#d97706",
-      th(WC[0], 8, "left", "#", "#92400e", 10) +
-      th(WC[1], 8, "left", "NAME", "#92400e", 10) +
-      th(WC[2], 8, "right", "AMOUNT", "#92400e", 10));
-    sections += card(cardTitle("&#128694; Donation Counter Contributions", "#92400e", 9) + wHead + wRows);
+    let wBody;
+    if (colsOf(T, nWalk) === 1) {
+      const WC = [32, 468 + extra, 96];
+      const wRows = walkinList.map((m, i) =>
+        row(T.oRow, i % 2 === 1 ? "#fffbeb" : "",
+          cell(WC[0], 8, "left", i + 1, "font-size:" + T.fsS + "px;color:#D6D0C4;") +
+          cell(WC[1], 8, "left", esc(m.name), "font-size:" + T.fs + "px;") +
+          cell(WC[2], 8, "right", CUR + " " + m.amount, "font-size:" + T.fs + "px;font-weight:700;"))
+      ).join("");
+      const wHead = headRow(T.oHead, "#d97706",
+        th(WC[0], 8, "left", "#", "#92400e", T.thFs) +
+        th(WC[1], 8, "left", "NAME", "#92400e", T.thFs) +
+        th(WC[2], 8, "right", "AMOUNT", "#92400e", T.thFs));
+      wBody = wHead + wRows;
+    } else {
+      const nW = numW(nWalk);
+      wBody = twoCols(walkinList, function(list, offset) {
+        let ch = 6;
+        list.forEach(m => { ch = Math.max(ch, String(CUR + " " + m.amount).length); });
+        const aW = amtWidth(ch, 60, colW - nW - 100), tW = colW - nW - aW;
+        const head = headRow(T.oHead, "#d97706",
+          th(nW, 6, "left", "#", "#92400e", T.thFs) + th(tW, 6, "left", "NAME", "#92400e", T.thFs) + th(aW, 6, "right", "AMOUNT", "#92400e", T.thFs));
+        const rows = list.map((m, i) =>
+          row(T.oRow, i % 2 === 1 ? "#fffbeb" : "",
+            cell(nW, 6, "left", offset + i + 1, "font-size:" + T.fsS + "px;color:#D6D0C4;") +
+            cell(tW, 6, "left", esc(m.name), "font-size:" + T.fs + "px;") +
+            cell(aW, 6, "right", CUR + " " + m.amount, "font-size:" + T.fs + "px;font-weight:700;"))
+        ).join("");
+        return "<div style='width:" + colW + "px;'>" + head + rows + "</div>";
+      });
+    }
+    sections += card(cardTitle("&#128694; Donation Counter Contributions", "#92400e", V.ctMbO) + wBody);
   }
 
   // ── Expenses This Month (skipped entirely when there are none) ──
   if (expenseList.length > 0) {
-    const EC = [32, 395, 75, 94];
-    const eRows = expenseList.map((x, i) =>
-      row(24, i % 2 === 1 ? "#FBF5EC" : "",
-        cell(EC[0], 8, "left", i + 1, "font-size:11.5px;color:#D6D0C4;") +
-        cell(EC[1], 8, "left", esc(x.title), "font-size:12.5px;") +
-        cell(EC[2], 8, "left", esc(x.date || "—"), "font-size:11.5px;color:#64748b;") +
-        cell(EC[3], 8, "right", CUR + " " + x.amount, "font-size:12.5px;"))
-    ).join("");
-    const eHead = headRow(24, ACCENT,
-      th(EC[0], 8, "left", "#", ACCENT, 10) +
-      th(EC[1], 8, "left", "TITLE", ACCENT, 10) +
-      th(EC[2], 8, "left", "DATE", ACCENT, 10) +
-      th(EC[3], 8, "right", "AMOUNT", ACCENT, 10));
-    sections += card(cardTitle("&#128184; Expenses This Month", "#5C1717", 9) + eHead + eRows);
+    let eBody;
+    if (colsOf(T, nExp) === 1) {
+      const EC = [32, 395 + extra, 75, 94];
+      const eRows = expenseList.map((x, i) =>
+        row(T.oRow, i % 2 === 1 ? "#FBF5EC" : "",
+          cell(EC[0], 8, "left", i + 1, "font-size:" + T.fsS + "px;color:#D6D0C4;") +
+          cell(EC[1], 8, "left", esc(x.title), "font-size:" + T.fs + "px;") +
+          cell(EC[2], 8, "left", esc(x.date || "—"), "font-size:" + T.fsS + "px;color:#64748b;") +
+          cell(EC[3], 8, "right", CUR + " " + x.amount, "font-size:" + T.fs + "px;"))
+      ).join("");
+      const eHead = headRow(T.oHead, ACCENT,
+        th(EC[0], 8, "left", "#", ACCENT, T.thFs) +
+        th(EC[1], 8, "left", "TITLE", ACCENT, T.thFs) +
+        th(EC[2], 8, "left", "DATE", ACCENT, T.thFs) +
+        th(EC[3], 8, "right", "AMOUNT", ACCENT, T.thFs));
+      eBody = eHead + eRows;
+    } else {
+      const nW = numW(nExp);
+      eBody = twoCols(expenseList, function(list, offset) {
+        let ch = 6;
+        list.forEach(m => { ch = Math.max(ch, String(CUR + " " + m.amount).length); });
+        const aW = amtWidth(ch, 60, colW - nW - 50 - 100), tW = colW - nW - 50 - aW;
+        const head = headRow(T.oHead, ACCENT,
+          th(nW, 6, "left", "#", ACCENT, T.thFs) + th(tW, 6, "left", "TITLE", ACCENT, T.thFs) +
+          th(50, 6, "left", "DATE", ACCENT, T.thFs) + th(aW, 6, "right", "AMOUNT", ACCENT, T.thFs));
+        const rows = list.map((x, i) =>
+          row(T.oRow, i % 2 === 1 ? "#FBF5EC" : "",
+            cell(nW, 6, "left", offset + i + 1, "font-size:" + T.fsS + "px;color:#D6D0C4;") +
+            cell(tW, 6, "left", esc(x.title), "font-size:" + T.fs + "px;") +
+            cell(50, 6, "left", esc(x.date || "—"), "font-size:" + T.fsS + "px;color:#64748b;") +
+            cell(aW, 6, "right", CUR + " " + x.amount, "font-size:" + T.fs + "px;"))
+        ).join("");
+        return "<div style='width:" + colW + "px;'>" + head + rows + "</div>";
+      });
+    }
+    sections += card(cardTitle("&#128184; Expenses This Month", "#5C1717", V.ctMbO) + eBody);
   }
 
   // NOTE: the All-Time Pending Summary and All-Time Fund Summary are intentionally NOT drawn in the PDF / PNG.
   // They stay in the email body (see _buildAdminSummaryEmail).
 
   const footerNote =
-    "<div style='margin-top:16px;padding-top:6px;border-top:" + BORDER + ";font-size:9px;color:#94A0A6;text-align:center;'>" +
+    "<div style='margin-top:" + V.footMt + "px;padding-top:6px;border-top:" + BORDER + ";font-size:9px;color:#94A0A6;text-align:center;'>" +
       "This is a system-generated document from " + esc(CFG.name) + ". No signature is required. Generated on " + esc(_admGeneratedStamp()) +
     "</div>";
 
   return "<html><head><meta charset='utf-8'></head>" +
-    "<body style='font-family:Arial,sans-serif;color:#2B2B2B;margin:0;padding:12px 32px;-webkit-print-color-adjust:exact;print-color-adjust:exact;'>" +
+    "<body style='font-family:Arial,sans-serif;color:#2B2B2B;margin:0;padding:" + V.bodyPad + "px 32px;-webkit-print-color-adjust:exact;print-color-adjust:exact;'>" +
     header + progressCard + statsRow + sections + footerNote +
     "</body></html>";
 }
+
 
 // ── Plain-text version, ready to select-all + copy-paste into WhatsApp/group chat.
 //    Email HTML can't run a working "Copy" button in most clients (Gmail strips onclick),

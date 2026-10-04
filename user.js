@@ -3497,6 +3497,79 @@ Uses jsPDF already loaded. No server call needed.
     }
   }
 
+  // ── ID Card Download Confirmation dialog (avatar dropdown → ID Card)
+  function _confirmIdCardDownload() {
+    const existing = document.getElementById("_idCardConfirmOverlay");
+    if (existing) existing.remove();
+
+    const isDark = document.body.classList.contains("user-dark");
+    const bgCard = isDark ? "#111827" : "#ffffff";
+    const bgPage = isDark ? "rgba(0,0,0,0.75)" : "rgba(0,0,0,0.55)";
+    const txtSub  = isDark ? "#94a3b8" : "#64748b";
+    const txtMain = isDark ? "#f1f5f9" : "#141b2d";
+    const borderC = isDark ? "rgba(193, 68, 14,0.22)" : "rgba(193, 68, 14,0.18)";
+
+    const ov = document.createElement("div");
+    ov.id = "_idCardConfirmOverlay";
+    ov.style.cssText = "position:fixed;inset:0;z-index:9999;background:" + bgPage + ";display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);";
+    ov.innerHTML = `
+      <div style="background:${bgCard};border-radius:20px;max-width:370px;width:100%;box-shadow:0 24px 80px rgba(0,0,0,0.45);border:1.5px solid ${borderC};overflow:hidden;animation:dropFade .2s ease;">
+
+        <!-- Header -->
+        <div style="background:linear-gradient(135deg,#0F172A 0%,#7A1F1F 60%,#0F172A 100%);padding:16px 18px;display:flex;align-items:center;gap:11px;border-bottom:2px solid rgba(193, 68, 14,0.35);">
+          <div style="width:38px;height:38px;background:rgba(193, 68, 14,0.18);border-radius:11px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <i class="fa-solid fa-address-card" style="color:#C1440E;font-size:1rem;"></i>
+          </div>
+          <div class="_u-flex-1">
+            <div style="font-weight:700;font-size:13.5px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Member ID Card</div>
+            <div style="font-size:10px;color:rgba(193, 68, 14,0.65);margin-top:1px;">Download confirmation</div>
+          </div>
+          <button onclick="document.getElementById('_idCardConfirmOverlay').remove()" style="background:none;border:none;color:rgba(255,255,255,0.45);font-size:17px;cursor:pointer;padding:0;margin-left:4px;box-shadow:none;line-height:1;flex-shrink:0;">✕</button>
+        </div>
+
+        <!-- Confirmation message -->
+        <div style="padding:20px 18px 6px;text-align:center;">
+          <div style="width:52px;height:52px;background:rgba(193, 68, 14,0.12);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 12px;">
+            <i class="fa-solid fa-file-arrow-down" style="color:#C1440E;font-size:1.4rem;"></i>
+          </div>
+          <div style="font-size:15px;font-weight:700;color:${txtMain};margin-bottom:8px;">Download ID Card?</div>
+          <div style="font-size:12.5px;color:${txtSub};line-height:1.7;margin-bottom:4px;">
+            Your <strong style="color:${txtMain};">Member ID Card</strong> will be downloaded as a PDF.
+          </div>
+          <div style="display:inline-flex;align-items:center;gap:5px;margin-top:8px;background:rgba(193, 68, 14,0.08);border:1px solid rgba(193, 68, 14,0.18);border-radius:8px;padding:5px 11px;">
+            <i class="fa-solid fa-shield-halved" class="_u-gold-icon-xs"></i>
+            <span style="font-size:10.5px;color:${txtSub};font-weight:500;">Saved directly to your device</span>
+          </div>
+        </div>
+
+        <!-- Yes / No buttons -->
+        <div style="padding:18px 18px 22px;display:flex;gap:10px;justify-content:center;">
+          <button onclick="document.getElementById('_idCardConfirmOverlay').remove()"
+            style="min-width:120px;padding:12px 20px;background:${isDark ? "#1e293b" : "#f1f5f9"};color:${txtSub};border:1.5px solid ${isDark ? "#334155" : "#e2e8f0"};border-radius:11px;font-family:var(--font-b);font-size:14px;font-weight:700;cursor:pointer;box-shadow:none;display:inline-flex;align-items:center;justify-content:center;gap:6px;">
+            <i class="fa-solid fa-xmark" style="font-size:12px;"></i> No
+          </button>
+          <button id="_idCardConfirmBtn" onclick="_doIdCardDownload()"
+            style="min-width:140px;padding:12px 20px;background:linear-gradient(135deg,#C1440E,#F59E0B);color:#fff;border:none;border-radius:11px;font-family:var(--font-b);font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 4px 14px rgba(193, 68, 14,0.38);display:inline-flex;align-items:center;justify-content:center;gap:6px;">
+            <i class="fa-solid fa-download" style="font-size:12px;"></i> Yes, Download
+          </button>
+        </div>
+
+      </div>`;
+    ov.addEventListener("click", function(e) { if (e.target === ov) ov.remove(); });
+    document.body.appendChild(ov);
+  }
+
+  function _doIdCardDownload() {
+    const ov = document.getElementById("_idCardConfirmOverlay");
+    const btn = document.getElementById("_idCardConfirmBtn");
+    if (!btn || btn.disabled) return; // guard against double-click
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Generating…';
+    downloadMemberIDCard().finally(function() {
+      if (ov) ov.remove();
+    });
+  }
+
   async function exportYearStatementPDF() {
     await _loadJsPDF();
     const { jsPDF } = window.jspdf;

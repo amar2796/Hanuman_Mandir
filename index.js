@@ -424,6 +424,7 @@ var _trLoaded = false;
         if (!siteTop) return;
         var h = siteTop.offsetHeight;
         document.body.style.paddingTop = h + "px";
+        document.documentElement.style.scrollPaddingTop = h + "px"; /* anchor links land just below header + banner */
         var navMenu = document.getElementById("navMenu");
         if (navMenu) navMenu.style.top = h + "px";
       }
@@ -437,6 +438,59 @@ var _trLoaded = false;
         setTimeout(function(){ banner.classList.remove("open"); banner.style = ""; _syncSiteTopHeight(); }, 360);
         try { sessionStorage.setItem("ann_dismissed", _annDismissedId || "1"); } catch(e){}
       }
+      /* ── Visit the Mandir: address / call / WhatsApp / email / directions / timings ──
+         Everything comes from APP in constants.js. A card whose data is missing is
+         hidden, so nothing empty or made-up is ever shown. All text is set with
+         textContent (never innerHTML). */
+      function initVisitSection() {
+        if (typeof APP === "undefined") return;
+        var $ = function (id) { return document.getElementById(id); };
+        var hide = function (id) { var e = $(id); if (e) e.style.display = "none"; };
+
+        // Address + directions
+        var addr = APP.address || APP.location || "";
+        if (addr) {
+          $("visitAddress").textContent = (APP.name ? APP.name + ", " : "") + addr + (APP.pin ? " – " + APP.pin : "");
+          // exact pin from the map embed URL (…!2d<lng>!3d<lat>…), else search by address
+          var dir = "";
+          var m = String(APP.mapEmbedUrl || "").match(/!2d(-?\d+(?:\.\d+)?)!3d(-?\d+(?:\.\d+)?)/);
+          if (m) dir = "https://www.google.com/maps/dir/?api=1&destination=" + m[2] + "," + m[1];
+          else dir = "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent((APP.name || "") + " " + addr);
+          $("visitDirections").href = dir;
+        } else { hide("visitAddressCard"); }
+
+        // Phone + WhatsApp
+        var raw = String(APP.phone || "").trim();
+        var digits = raw.replace(/\D/g, "");
+        if (digits.length >= 8) {
+          var pretty = raw.replace(/^\+91\s?(\d{5})(\d{5})$/, "+91 $1 $2");
+          $("visitPhone").textContent = pretty;
+          $("visitCallBtn").href = "tel:" + (raw.charAt(0) === "+" ? "+" : "") + digits;
+          $("visitWhatsappBtn").href = "https://wa.me/" + digits + "?text=" + encodeURIComponent((APP.tagline || "Namaste") + " 🙏");
+        } else { hide("visitCallCard"); hide("visitWhatsappCard"); }
+
+        // Email
+        var mail = String(APP.email || "").trim();
+        if (mail) {
+          $("visitEmail").textContent = mail;
+          $("visitEmailBtn").href = "mailto:" + mail;
+        } else { hide("visitEmailCard"); }
+
+        // Timings (optional)
+        var rows = Array.isArray(APP.timings) ? APP.timings.filter(function (t) { return t && t.label && t.time; }) : [];
+        if (rows.length) {
+          var ul = $("visitTimings");
+          rows.forEach(function (t) {
+            var li = document.createElement("li");
+            var a = document.createElement("span"); a.textContent = t.label;
+            var b = document.createElement("span"); b.textContent = t.time;
+            li.appendChild(a); li.appendChild(b); ul.appendChild(li);
+          });
+          $("visitTimingsCard").style.display = "";
+        }
+      }
+      document.addEventListener("DOMContentLoaded", initVisitSection);
+
       function _applyAnnouncement(data) {
         if (!data || !data.Message) return;
         var dismissed = "";
@@ -602,6 +656,28 @@ var _trLoaded = false;
       }
       window.addEventListener("scroll", reveal);
       reveal();
+
+      /* Reading-progress line (decorative, one rAF-throttled passive listener) */
+      (function () {
+        try {
+          var bar = document.createElement("div");
+          bar.id = "scrollProgress";
+          bar.setAttribute("aria-hidden", "true");
+          document.body.appendChild(bar);
+          var ticking = false;
+          function paint() {
+            ticking = false;
+            var max = document.documentElement.scrollHeight - window.innerHeight;
+            var p = max > 0 ? Math.min(1, Math.max(0, window.pageYOffset / max)) : 0;
+            bar.style.transform = "scaleX(" + p + ")";
+          }
+          window.addEventListener("scroll", function () {
+            if (!ticking) { ticking = true; window.requestAnimationFrame(paint); }
+          }, { passive: true });
+          window.addEventListener("resize", paint, { passive: true });
+          paint();
+        } catch (e) { /* never block the page for a decorative bar */ }
+      })();
 
       /* Floating Ram */
       function createFloatingRam() {

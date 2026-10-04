@@ -2674,3 +2674,435 @@ textarea:focus-visible {
   outline-offset: 2px;
   border-radius: 4px;
 }
+
+/* ══ MEMBERS — COMPACT MOBILE CARD ══
+   On phones the old layout turned the photo into a short wide strip, which cut
+   the faces of these portrait photos. Below 760px the card is now a compact
+   header (photo on the left; role, name and place beside it) with the bio full
+   width underneath. Desktop layout (above 760px) is unchanged.
+   NOTE: keep this block at the END of the file — an earlier "max-width: 480px"
+   member-card rule would otherwise override it. */
+@media (max-width: 760px) {
+  .member-card.active {
+    display: grid;
+    grid-template-columns: 132px 1fr;
+    column-gap: 16px;
+    align-items: start;
+    padding: 18px 18px 20px;
+  }
+  .member-photo-side {
+    grid-column: 1;
+    grid-row: 1 / span 3;
+    flex: none;
+    width: 132px;
+    height: 168px;
+    min-height: 0;
+    max-height: none;
+    border-radius: 16px;
+    border: 2px solid var(--color-gold-soft);
+    box-shadow: 0 6px 18px rgba(92,23,23,0.25);
+  }
+  .member-photo-side::before,
+  .member-photo-side::after,
+  .member-photo-side .member-photo-overlay { display: none; }
+  .member-photo-side img.member-avatar { object-position: center 18%; }
+  /* initials fallback (shown only if a photo fails to load) must fit the small box */
+  .member-avatar-placeholder {
+    width: 100%; height: 100%;
+    margin: 0; border: 0; border-radius: 0;
+    box-shadow: none;
+    font-size: 2.2rem;
+  }
+  /* let the text blocks sit directly in the card grid */
+  .member-info-side { display: contents; }
+  .member-role-badge {
+    grid-column: 2; align-self: end;
+    margin: 0 0 8px;
+    font-size: 10px; padding: 3px 10px;
+  }
+  .member-name { grid-column: 2; font-size: 1.35rem; margin: 0 0 4px; }
+  .member-title { grid-column: 2; font-size: 0.82rem; margin: 0; align-self: start; }
+  .member-divider { grid-column: 1 / -1; margin: 16px 0 14px; }
+  .member-bio { grid-column: 1 / -1; font-size: 0.92rem; line-height: 1.7; }
+}
+@media (max-width: 500px) {
+  .member-card.active { grid-template-columns: 108px 1fr; column-gap: 14px; padding: 16px 16px 18px; }
+  .member-photo-side { width: 108px; height: 138px; }
+  .member-avatar-placeholder { font-size: 1.9rem; }
+  .member-role-badge { font-size: 9.5px; padding: 3px 9px; margin-bottom: 6px; }
+  .member-name { font-size: 1.2rem; margin-bottom: 3px; }
+  .member-title { font-size: 0.78rem; }
+  .member-divider { margin: 14px 0; }
+  .member-bio { font-size: 0.9rem; line-height: 1.65; }
+}
+
+/* ══ MEMBERS — ENTRANCE ANIMATION (phone + desktop) ══
+   Each time a member card appears: the photo reveals with a one-time light
+   sweep, then the role, name, place, divider and bio follow in a short stagger.
+   Phone: the photo box pops in. Desktop: the photo zooms gently into place.
+   Only transform + opacity are animated (smooth, GPU-friendly), every animation
+   runs ONCE (nothing loops, so no battery cost), and the prefers-reduced-motion
+   rule at the end of this block switches it all off (content then shows
+   instantly) for users who ask. */
+
+/* one-time light sweep across the photo (re-uses the decorative ::after ring,
+   which sits hidden behind the photo anyway) */
+.member-card.active .member-photo-side::after {
+  display: block;
+  content: '';
+  position: absolute;
+  top: 0; bottom: 0; left: 0;
+  width: 45%; height: auto;
+  border: 0; border-radius: 0;
+  z-index: 4;
+  pointer-events: none;
+  background: linear-gradient(105deg, transparent 0%, rgba(255,255,255,0.5) 50%, transparent 100%);
+  transform: translateX(-160%) skewX(-18deg);
+  animation: memberPhotoShine 0.9s ease-out 0.7s both;
+}
+.member-card.active .member-role-badge { animation: memberTextIn 0.45s ease-out 0.18s both; }
+.member-card.active .member-name       { animation: memberTextIn 0.45s ease-out 0.26s both; }
+.member-card.active .member-title      { animation: memberTextIn 0.45s ease-out 0.34s both; }
+.member-card.active .member-divider    { transform-origin: left center; animation: memberDividerGrow 0.5s ease-out 0.42s both; }
+.member-card.active .member-bio        { animation: memberBioIn 0.5s ease-out 0.5s both; }
+
+@media (max-width: 760px) {
+  .member-card.active .member-photo-side {
+    animation: memberPhotoPop 0.6s cubic-bezier(.34,1.4,.64,1) 0.1s both;
+  }
+}
+@media (min-width: 761px) {
+  /* the photo panel is full-bleed on desktop, so zoom the picture inside it
+     (the panel clips it) instead of scaling the panel itself */
+  .member-card.active .member-photo-side img.member-avatar {
+    animation: memberImgZoom 0.9s ease-out 0.05s both;
+  }
+}
+@keyframes memberPhotoPop {
+  from { opacity: 0; transform: scale(0.82) rotate(-3deg); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes memberImgZoom {
+  from { opacity: 0; transform: scale(1.14); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes memberPhotoShine {
+  from { transform: translateX(-160%) skewX(-18deg); }
+  to   { transform: translateX(420%) skewX(-18deg); }
+}
+@keyframes memberTextIn {
+  from { opacity: 0; transform: translateX(22px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes memberDividerGrow {
+  from { opacity: 0; transform: scaleX(0); }
+  to   { opacity: 1; transform: scaleX(1); }
+}
+@keyframes memberBioIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: none; }
+}
+/* Reduced motion: no animation AND no start delay, so the card appears instantly */
+@media (prefers-reduced-motion: reduce) {
+  .member-card.active .member-photo-side,
+  .member-card.active .member-photo-side img.member-avatar,
+  .member-card.active .member-role-badge,
+  .member-card.active .member-name,
+  .member-card.active .member-title,
+  .member-card.active .member-divider,
+  .member-card.active .member-bio { animation: none; }
+  .member-card.active .member-photo-side::after { display: none; }
+}
+
+/* ══ ACCESSIBILITY: skip link + main landmark ══ */
+.skip-link {
+  position: absolute; left: 12px; top: -140px; z-index: 100000;
+  background: #fff; color: var(--color-primary-dark);
+  padding: 10px 16px; border-radius: 8px;
+  font-weight: 600; font-size: 0.9rem; text-decoration: none;
+  transition: top 0.15s ease;
+}
+.skip-link:focus { top: 12px; box-shadow: 0 6px 20px rgba(0,0,0,0.25); }
+#main:focus { outline: none; }
+
+/* ══ VISIT THE MANDIR ══ */
+.visit-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  max-width: 860px;
+  margin: 28px auto 0;
+  text-align: left;
+}
+.visit-card {
+  background: #fff;
+  border: 1px solid rgba(193,68,14,0.18);
+  border-radius: 18px;
+  padding: 22px 18px;
+  box-shadow: 0 6px 24px rgba(122,31,31,0.10);
+  display: flex; flex-direction: column; align-items: center;
+  gap: 6px; text-align: center;
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+.visit-card:hover { transform: translateY(-3px); box-shadow: 0 12px 32px rgba(122,31,31,0.16); }
+.visit-icon {
+  width: 46px; height: 46px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(135deg, var(--color-brand), var(--color-primary-dark));
+  color: #fff; font-size: 1.1rem;
+  box-shadow: 0 4px 12px rgba(122,31,31,0.3);
+}
+.visit-icon.is-whatsapp { background: linear-gradient(135deg, #25D366, #128C7E); box-shadow: 0 4px 12px rgba(18,140,126,0.3); }
+.visit-label {
+  font-size: 0.72rem; font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--color-brand); margin-top: 4px;
+}
+.visit-value { font-size: 0.95rem; color: var(--polish-ink); font-weight: 500; line-height: 1.5; overflow-wrap: anywhere; }
+.visit-btn {
+  margin-top: 8px;
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 9px 18px; border-radius: 999px;
+  background: var(--color-brand); color: #fff;
+  font-weight: 600; font-size: 0.85rem; text-decoration: none;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.visit-btn:hover, .visit-btn:focus-visible { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(122,31,31,0.3); }
+.visit-btn.is-whatsapp { background: #1FA855; }
+.visit-timings { grid-column: 1 / -1; align-items: stretch; text-align: left; }
+.visit-timings .visit-icon, .visit-timings .visit-label { align-self: center; }
+.visit-timings ul {
+  list-style: none; margin: 8px 0 0; padding: 0;
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 28px;
+}
+.visit-timings li {
+  display: flex; justify-content: space-between; gap: 12px;
+  padding: 9px 0; border-bottom: 1px dashed rgba(193,68,14,0.28);
+  font-size: 0.92rem; color: var(--polish-ink);
+}
+.visit-timings li span:last-child { font-weight: 600; color: var(--color-primary-dark); white-space: nowrap; }
+@media (max-width: 640px) {
+  .visit-grid { grid-template-columns: 1fr; gap: 14px; margin-top: 22px; }
+  .visit-timings ul { grid-template-columns: 1fr; }
+}
+
+/* ══ TABLET HEADER (701-1023px) ══
+   The full desktop nav + Donate/Login buttons need about 1000px, so on tablets
+   and small laptops they ran off the right edge (Donate/Login unreachable).
+   Below 1024px the header now uses the same hamburger menu as phones - its menu
+   already contains every link plus Donate and Login. Desktop (1024px+) and
+   phones (700px and below) are unchanged. */
+@media (min-width: 701px) and (max-width: 1023px) {
+  .nav-links, .login-nav-links { display: none; }
+  .hamburger-btn { display: flex !important; }
+  /* the 701px+ rule above hides the menu with !important; show it again, but only when opened */
+  .nav-menu { display: none !important; }
+  .nav-menu.open { display: flex !important; }
+}
+
+/* ══ COLOUR POLISH (same maroon / rust / gold / cream theme) ══
+   The theme colours are untouched. What changes: the cold blue-grey (slate)
+   used for headings, body text, shadows and borders is replaced by warm
+   brown tones of the same palette, so text and surfaces feel like one family;
+   headings use the deep maroon; gold is used for accents; and low-contrast
+   text on the dark sections is lifted to a readable level. */
+:root {
+  --polish-ink:   #3B2A26;   /* warm dark brown - strong text            */
+  --polish-muted: #6B5750;   /* warm brown-grey - body / captions        */
+  --polish-faint: #7F6C64;   /* softer captions (still AA on cream)      */
+}
+body { background: linear-gradient(135deg, var(--bg-page) 0%, #FBF3E6 100%); }
+
+/* Headings: deep maroon + a real gold underline (was slate, underline faded to near-white) */
+.section h2,
+.feedback-section h2 { color: var(--color-primary-dark); }
+.section h2::after {
+  background: linear-gradient(90deg, var(--color-brand), var(--color-gold));
+  box-shadow: 0 1px 6px rgba(212,175,55,0.35);
+}
+
+/* Body / caption text: warm instead of slate */
+.section p,
+.feedback-section > p,
+.members-subtitle,
+#feedbackThanks p,
+.card p { color: var(--polish-muted); }
+.about-stat-label,
+.feedback-form label,
+.member-title { color: var(--polish-muted); }
+.member-bio { color: var(--polish-muted); }
+.gallery-loading-msg,
+.gallery-empty-msg { color: var(--polish-faint); }
+
+/* Chaupai verse: deep maroon (was slate) */
+.cp-char span { color: var(--color-primary); }
+
+/* Cards: warm shadows + a soft gold hairline */
+.about-stat {
+  border-color: rgba(212,175,55,0.40);
+  box-shadow: 0 6px 22px rgba(122,31,31,0.09), inset 0 1px 0 rgba(255,255,255,0.9);
+}
+.card { box-shadow: 0 8px 26px rgba(122,31,31,0.08); }
+.visit-card { border-color: rgba(212,175,55,0.38); }
+
+/* Feedback form: warm borders, brand focus ring */
+.feedback-form input,
+.feedback-form textarea { border-color: rgba(193,68,14,0.22); background: var(--bg-surface-cream); }
+.feedback-form input:focus,
+.feedback-form textarea:focus {
+  border-color: var(--color-brand);
+  background: #fff;
+  box-shadow: var(--shadow-focus);
+}
+
+/* Dark "registered members" block: lift the faint text to readable levels */
+.cs-eyebrow { color: var(--color-gold); border-color: rgba(212,175,55,0.45); background: rgba(212,175,55,0.10); }
+.cs-eyebrow-dot { background: var(--color-gold); }
+.cs-sublabel { color: rgba(251,235,200,0.62); }
+.cs-cta { color: rgba(251,235,200,0.80); }
+.cs-cta a { color: var(--color-gold); border-bottom-color: rgba(212,175,55,0.55); }
+.cs-cta a:hover { color: var(--color-gold-soft); border-bottom-color: rgba(251,235,200,0.7); }
+
+/* Footer: gold-cream text on the dark maroon (was dim orange) */
+.footer { color: rgba(251,235,200,0.85); }
+.footer .footer-tagline { color: rgba(212,175,55,0.85); }   /* '.footer span' (specificity 0,1,1) was winning */
+/* ══════════════════════════════════════════════════════════════════════
+   HOME PAGE — PREMIUM POLISH (appended last; theme colours unchanged)
+   Everything below only uses the existing palette tokens. Rules are
+   additive: animations are one-time (nothing loops), use transform /
+   opacity only, and are switched off by the reduced-motion block at the
+   very end of this section.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* 1 · Anchor links: the header is fixed, so section links (Features,
+      Feedback, …) used to scroll the heading UNDER the header.
+      This leaves a little breathing room below it on every screen. */
+html { scroll-padding-top: 64px; }
+@media (max-width: 768px) { html { scroll-padding-top: 52px; } }
+/* (index.js overwrites this with the exact header + announcement-banner height) */
+
+/* 2 · Splash: 100vh is taller than the visible area on phones (browser
+      bar). dvh follows the real visible height; older browsers ignore
+      this line and keep the 100vh above. */
+#splash-screen { height: 100dvh; }
+
+/* 4 · Mobile menu: on a phone held sideways the list was taller than the
+      screen and the page behind is locked, so Donate / Login could not be
+      reached. The menu now scrolls inside itself when it needs to. */
+.nav-menu {
+  max-height: calc(100dvh - 110px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* 5 · Entrance animation (one-time, staggered) ─────────────────────── */
+@keyframes polishRise {
+  from { opacity: 0; transform: translateY(22px) scale(0.97); }
+}
+@keyframes polishRule {
+  from { opacity: 0; transform: scaleX(0); }
+}
+@keyframes polishPop {
+  from { opacity: 0; transform: scale(0.4) rotate(-18deg); }
+}
+@keyframes polishLine {
+  from { opacity: 0; transform: scaleX(0); }
+}
+@keyframes polishNavIn {
+  from { opacity: 0; transform: translateX(-14px); }
+}
+
+/* about tiles, feature cards, visit cards, live-count card: rise in one
+   after another when their section scrolls into view.
+   (fill-mode "backwards" only — after the animation ends the normal hover
+   effects keep working.) */
+.reveal.active .about-stat,
+.reveal.active .cards .card,
+.reveal.active .visit-card,
+.reveal.active .cs-card {
+  animation: polishRise 0.65s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+.reveal.active .about-stat:nth-child(1), .reveal.active .cards .card:nth-child(1), .reveal.active .visit-card:nth-child(1), .reveal.active .cs-card { animation-delay: 0.12s; }
+.reveal.active .about-stat:nth-child(2), .reveal.active .cards .card:nth-child(2), .reveal.active .visit-card:nth-child(2) { animation-delay: 0.20s; }
+.reveal.active .about-stat:nth-child(3), .reveal.active .cards .card:nth-child(3), .reveal.active .visit-card:nth-child(3) { animation-delay: 0.28s; }
+.reveal.active .about-stat:nth-child(4), .reveal.active .cards .card:nth-child(4), .reveal.active .visit-card:nth-child(4) { animation-delay: 0.36s; }
+.reveal.active .visit-card:nth-child(5) { animation-delay: 0.44s; }
+
+/* gold underline under each section heading draws itself */
+.section.reveal.active h2::after,
+.feedback-section.reveal.active h2::after {
+  animation: polishRule 0.7s ease-out 0.3s backwards;
+}
+
+/* ornament dividers: the two lines grow outward, the symbol pops in */
+.section-divider.reveal.active .sd-line { animation: polishLine 0.9s ease-out backwards; }
+.section-divider.reveal.active .sd-line:first-child { transform-origin: right center; }
+.section-divider.reveal.active .sd-line:last-child  { transform-origin: left center; }
+.section-divider.reveal.active .sd-symbol { animation: polishPop 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) 0.2s backwards; }
+
+/* mobile menu items glide in one by one each time the menu opens */
+.nav-menu.open a { animation: polishNavIn 0.34s ease-out backwards; }
+.nav-menu.open a:nth-child(1) { animation-delay: 0.02s; }
+.nav-menu.open a:nth-child(2) { animation-delay: 0.06s; }
+.nav-menu.open a:nth-child(3) { animation-delay: 0.10s; }
+.nav-menu.open a:nth-child(4) { animation-delay: 0.14s; }
+.nav-menu.open a:nth-child(5) { animation-delay: 0.18s; }
+.nav-menu.open a:nth-child(6) { animation-delay: 0.22s; }
+.nav-menu.open a:nth-child(7) { animation-delay: 0.26s; }
+.nav-menu.open a:nth-child(8) { animation-delay: 0.30s; }
+
+/* 6 · Touch screens: hover effects "stick" after a tap on phones (the card
+      stays lifted until you tap elsewhere). Here the lift is replaced by a
+      quick press-in feedback that springs back when the finger lifts. */
+@media (hover: none) {
+  .card:hover {
+    transform: none;
+    box-shadow: 0 8px 26px rgba(122,31,31,0.08);
+    border-color: rgba(193,68,14,0.18);
+    border-top-color: rgba(193,68,14,0.55);
+  }
+  .card:hover::before { left: -80%; }
+  .card:hover h3 i { transform: none; filter: drop-shadow(0 0 0px rgba(193,68,14,0)); }
+  .about-stat:hover { transform: none; box-shadow: 0 6px 22px rgba(122,31,31,0.09), inset 0 1px 0 rgba(255,255,255,0.9); }
+  .visit-card:hover { transform: none; box-shadow: 0 6px 24px rgba(122,31,31,0.10); }
+
+  .card:active,
+  .about-stat:active,
+  .visit-card:active { transform: scale(0.98); }
+  .visit-btn:active,
+  .feedback-submit-btn:active,
+  .members-nav-btn:active,
+  .hamburger-btn:active,
+  .audio-btn:active,
+  .login-nav-links a:active { transform: scale(0.95); }
+}
+
+/* 7 · Thin gold reading-progress line at the very top of the page
+      (created by index.js; purely decorative, ignores taps). */
+#scrollProgress {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 3px;
+  z-index: 1200;
+  pointer-events: none;
+  transform-origin: left center;
+  transform: scaleX(0);
+  background: linear-gradient(90deg, var(--color-brand), var(--color-gold), var(--color-gold-soft));
+  box-shadow: 0 0 8px rgba(212,175,55,0.55);
+  will-change: transform;
+}
+
+/* 8 · Reduced motion: switch every animation added above off completely
+      (the global rule earlier only shortens them, it does not remove the
+      start delay). Content then simply shows. */
+@media (prefers-reduced-motion: reduce) {
+  .reveal.active .about-stat,
+  .reveal.active .cards .card,
+  .reveal.active .visit-card,
+  .reveal.active .cs-card,
+  .section.reveal.active h2::after,
+  .feedback-section.reveal.active h2::after,
+  .section-divider.reveal.active .sd-line,
+  .section-divider.reveal.active .sd-symbol,
+  .nav-menu.open a { animation: none; }
+}

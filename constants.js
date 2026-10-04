@@ -69,6 +69,14 @@
       phone:   "+918127991402",
       email:   "hanumanmandirpaliya@gmail.com",
       website: "https://amar2796.github.io/Hanuman_Mandir/",
+
+      /* ── TIMINGS (optional) ────────────────────────────────────
+         Shown in the "Visit the Mandir" section on the homepage.
+         Leave as [] to hide the timings card. Add one row per timing, e.g.
+           { label: "Morning Aarti", time: "6:00 AM" },
+           { label: "Evening Aarti", time: "7:00 PM" },
+         Frontend-only (not synced to appscript). */
+      timings: [],
     
     
       /* ── HOMEPAGE DISPLAY ──────────────────────────────────────────────
