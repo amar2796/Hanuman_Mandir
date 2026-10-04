@@ -793,6 +793,7 @@ function _renderPagination(containerId, totalPages, currentPage, onPageFn) {
           + '</div>';
       }).join("");
       const _safeId = String(id).replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+      const _vuFallbackAvatar = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='84' height='84'%3E%3Ccircle cx='42' cy='42' r='42' fill='%230F766E'/%3E%3Ctext x='42' y='55' text-anchor='middle' fill='white' font-size='36' font-family='Arial'%3E%26%23128100%3B%3C/text%3E%3C/svg%3E";
       // [FIX] Admin accounts can never be deleted, regardless of contribution
       // total — same rule as the table row's delete button. Use Enable/Disable
       // (Status) instead, which already exists for exactly this purpose.
@@ -811,6 +812,10 @@ function _renderPagination(containerId, totalPages, currentPage, onPageFn) {
         : '';
       const html = '<div class="_mhdr"><h3><i class="fa-solid fa-eye" style="color:#C1440E;margin-right:6px;"></i> Member Details</h3><button class="_mcls" onclick="closeModal()">×</button></div>'
         + '<div class="_mbdy" style="padding:10px 16px;">'
+        + '<div style="text-align:center;padding:6px 0 10px;">'
+        +   '<img id="vu_photo" src="' + _vuFallbackAvatar + '" alt="" '
+        +   'style="width:84px;height:84px;border-radius:50%;object-fit:cover;border:3px solid #C1440E;background:#faeeda;display:block;margin:0 auto;"/>'
+        + '</div>'
         + '<div style="width:100%;">' + tableRows + '</div>'
         + '</div>'
         + '<div class="_mft">'
@@ -819,6 +824,20 @@ function _renderPagination(containerId, totalPages, currentPage, onPageFn) {
         + '<button class="_mbtn" style="background:linear-gradient(135deg,#C1440E,#e8920a);" onclick="closeModal();openEditUser(\'' + _safeId + '\')"><i class="fa-solid fa-pen"></i> Edit</button>'
         + '</div>';
       openModal(html, "460px");
+      // Load the member's real photo via the Apps Script proxy (same as the
+      // Edit User form) — avoids Drive CORS/429 problems on direct URLs.
+      if (u.PhotoURL) {
+        setTimeout(async function() {
+          var imgEl = document.getElementById("vu_photo");
+          if (!imgEl || !imgEl.isConnected) return;
+          try {
+            var b64 = await _fetchAdminPhotoBase64(u.PhotoURL);
+            if (b64 && imgEl.isConnected) { imgEl.src = b64; return; }
+          } catch (e) {}
+          var thumb = _driveImgSrc(u.PhotoURL);
+          if (thumb && imgEl.isConnected) imgEl.src = thumb;
+        }, 80);
+      }
     }
 
     /* ── DOB format helpers ──────────────────────────────────────────────
