@@ -1020,7 +1020,7 @@ function _renderPagination(containerId, totalPages, currentPage, onPageFn) {
             photoURL = res.photoUrl;
             toast("✅ Photo uploaded!");
           } else {
-            toast("Photo upload failed, profile still updating.", "warn");
+            toast("Photo upload failed: " + (res.message || "unknown error") + " (profile still updating)", "warn");
           }
         } catch (e) {
           toast("Photo upload error: " + e.message, "warn");

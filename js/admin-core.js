@@ -1225,7 +1225,7 @@
           if (!response.ok) throw new Error("Server error: " + response.status);
           let res = await response.json();
           if (res.status === "success") { photoURL = res.photoUrl; toast("✅ Photo uploaded!"); }
-          else toast("Photo upload failed, profile still updating.", "warn");
+          else toast("Photo upload failed: " + (res.message || "unknown error") + " (profile still updating)", "warn");
         } catch (e) { toast("Photo upload error: " + e.message, "warn"); }
       }
       try {

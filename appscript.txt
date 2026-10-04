@@ -6422,7 +6422,11 @@ function doPost(e) {
     }
 
     // FIX SEC-9: Verify session token on all doPost actions — photo uploads modify Drive and user data
-    const _postUserId = sanitize(data.UserId || data.userId || "", 30);
+    // [FIX] Caller identity = data.userId FIRST (matches doGet/_verifySession precedence).
+    // Previously data.UserId (the TARGET member, e.g. when an admin edits a member's
+    // photo) won, so the admin's token was checked against the member's row —
+    // which is blank when the member isn't logged in → "token blank" rejection.
+    const _postUserId = sanitize(data.userId || data.UserId || "", 30);
     const _postToken  = sanitize(data.sessionToken || data.token || "", 64);
     if (!_postUserId || !_postToken) {
       logAction(_postUserId || "Unknown", "REJECTED_NO_TOKEN", "doPost action: " + (data.action||"unknown") + " — missing userId or sessionToken", "", "", { severity:"WARN", result:"BLOCKED" });
@@ -6438,6 +6442,16 @@ function doPost(e) {
 
     if (data.action === "uploadAndSaveProfile") {
       if (!data.base64 || !data.fileName) return ContentService.createTextOutput(JSON.stringify({status:"error",message:"Missing data."})).setMimeType(ContentService.MimeType.JSON);
+      // [SEC] Authorization: a caller may only change their OWN profile photo,
+      // unless the verified caller (_postUserId) has the Admin role.
+      const _targetUserId = sanitize(data.UserId || "", 30);
+      if (_targetUserId && _targetUserId !== _postUserId) {
+        const _caller = getSheetData(SHEETS.USERS).find(u => String(u.UserId || "").trim() === _postUserId);
+        if (!_caller || String(_caller.Role || "").toLowerCase() !== "admin") {
+          logAction(_postUserId, "REJECTED_NOT_ADMIN", "uploadAndSaveProfile for " + _targetUserId + " by non-admin", "", "", { severity:"WARN", result:"BLOCKED" });
+          return ContentService.createTextOutput(JSON.stringify({status:"error",message:"Not allowed to change another user's photo."})).setMimeType(ContentService.MimeType.JSON);
+        }
+      }
       // Try to delete old photo — handle both lh3 and thumbnail URL formats
       if (data.oldPhotoURL) {
         try {

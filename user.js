@@ -866,7 +866,7 @@ const _U_NOTIF_DISMISSED = _U_PREFIX + "_notif_dismissed_ids"; // notification b
         const _uploadTimer = setTimeout(function() { _uploadCtrl.abort(); }, 45000); // 45s — aligned with other timeouts app-wide
         let resp = await fetch(API_URL, { method: "POST", signal: _uploadCtrl.signal, body: JSON.stringify({ action: "uploadAndSaveProfile", UserId: s.userId, Name: name, Mobile: myProfile?.Mobile || "", Role: s.role, Password: "", Email: email, Village: village, Address: address, DOB: dob, Status: "Active", AdminName: name, base64: _pendingCroppedB64, fileName: "User_" + s.userId + "_" + Date.now() + ".jpg", oldPhotoURL: myProfile?.PhotoURL || "", sessionToken: s.sessionToken || "" }) });
         clearTimeout(_uploadTimer);
-        let res = await resp.json(); if (res.status === "success") { photoURL = res.photoUrl; if (myProfile?.PhotoURL) delete window._photoB64Cache[myProfile.PhotoURL]; } else toast("Photo upload failed, profile still updating.", "warn");
+        let res = await resp.json(); if (res.status === "success") { photoURL = res.photoUrl; if (myProfile?.PhotoURL) delete window._photoB64Cache[myProfile.PhotoURL]; } else toast("Photo upload failed: " + (res.message || "unknown error") + " (profile still updating)", "warn");
       } catch (e) {
         if (e.name === "AbortError") { toast("Upload timed out. Try a smaller photo.", "error"); if (_saveBtn) { _saveBtn.disabled = false; _saveBtn.innerHTML = _saveBtn.dataset.origHtml; } return; }
         toast("Photo upload error: " + e.message, "warn");
