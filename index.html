@@ -44,6 +44,9 @@
     <link rel="icon" type="image/png" href="Image/logo.PNG">
     <link rel="apple-touch-icon" href="Image/logo.PNG">
     <link rel="preload" as="image" href="Image/Background_pic.webp" type="image/webp" fetchpriority="high">
+    <link rel="preload" as="image" href="Image/Ambika.webp" type="image/webp">
+    <link rel="preload" as="image" href="Image/RamJag.webp" type="image/webp">
+    <link rel="preload" as="image" href="Image/RamSankar.webp" type="image/webp">
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -60,8 +63,6 @@
     <link rel="stylesheet" href="design-system-v2.css">
     <link rel="stylesheet" href="components-v2.css">
     <link rel="stylesheet" href="index.css">
-    <!-- If JavaScript is off/blocked, show the scroll-reveal sections instead of leaving them invisible -->
-    <noscript><style>.reveal{opacity:1!important;transform:none!important}#splash-screen{display:none!important}</style></noscript>
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to main content</a>
@@ -317,8 +318,9 @@
       <div class="member-card" id="memberCard2">
         <div class="member-photo-side">
           <img class="member-avatar" src="Image/RamJag.webp" alt="Ram Jag Vishwakarma" 
-            onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
+            onerror="this.style.display='none';">
           <div class="member-photo-overlay"></div>
+          <div class="member-avatar-placeholder">RJV</div>
         </div>
         <div class="member-info-side">
           <div class="member-role-badge">
@@ -589,41 +591,67 @@
     <div class="section reveal" id="visitSection">
       <h2>Visit the Mandir</h2>
       <p>Come for darshan, join the community, or reach us for any seva or donation query. 🙏</p>
-      <div class="visit-grid">
-        <div class="visit-card" id="visitAddressCard">
-          <div class="visit-icon"><i class="fa-solid fa-location-dot"></i></div>
-          <div class="visit-label">Address</div>
-          <div class="visit-value" id="visitAddress">…</div>
-          <a class="visit-btn" id="visitDirections" href="#" target="_blank" rel="noopener noreferrer">
-            <i class="fa-solid fa-diamond-turn-right"></i> Get Directions
-          </a>
+
+      <div class="visit-layout">
+
+        <!-- Map + address (single place for location on the page) -->
+        <div class="visit-map-card" id="visitAddressCard">
+          <div class="visit-map-frame">
+            <iframe
+            id="mapEmbedFrame"
+            src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3273.497389457402!2d82.20519597492734!3d26.321060585267084!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x399a790bd4e8dff3%3A0x93c61c2049ae55f2!2sHanuman%20Mandir!5e1!3m2!1sen!2sin!4v1775203315104!5m2!1sen!2sin"
+            allowfullscreen=""
+            loading="lazy"
+            referrerpolicy="no-referrer-when-downgrade"
+            title="…">
+          </iframe>
+          </div>
+          <div class="visit-map-bar">
+            <div class="visit-map-info">
+              <span class="visit-pin"><i class="fa-solid fa-location-dot"></i></span>
+              <div class="visit-map-text">
+                <div class="visit-label">Find Us</div>
+                <div class="visit-value" id="visitAddress">…</div>
+              </div>
+            </div>
+            <a class="visit-btn" id="visitDirections" href="#" target="_blank" rel="noopener noreferrer">
+              <i class="fa-solid fa-diamond-turn-right"></i> Get Directions
+            </a>
+          </div>
         </div>
-        <div class="visit-card" id="visitCallCard">
-          <div class="visit-icon"><i class="fa-solid fa-phone"></i></div>
-          <div class="visit-label">Call Us</div>
-          <div class="visit-value" id="visitPhone">…</div>
-          <a class="visit-btn" id="visitCallBtn" href="#"><i class="fa-solid fa-phone"></i> Call Now</a>
+
+        <!-- Quick contact + timings -->
+        <div class="visit-side">
+          <div class="visit-actions">
+            <div class="visit-action-wrap" id="visitCallCard">
+              <a class="visit-action" id="visitCallBtn" href="#" aria-label="Call the mandir">
+                <span class="va-icon"><i class="fa-solid fa-phone"></i></span>
+                <span class="va-text"><span class="va-label">Call Us</span><span class="va-value" id="visitPhone">…</span></span>
+                <i class="fa-solid fa-chevron-right va-arrow"></i>
+              </a>
+            </div>
+            <div class="visit-action-wrap" id="visitWhatsappCard">
+              <a class="visit-action is-whatsapp" id="visitWhatsappBtn" href="#" target="_blank" rel="noopener noreferrer" aria-label="Chat on WhatsApp">
+                <span class="va-icon"><i class="fa-brands fa-whatsapp"></i></span>
+                <span class="va-text"><span class="va-label">WhatsApp</span><span class="va-value">Message us anytime</span></span>
+                <i class="fa-solid fa-chevron-right va-arrow"></i>
+              </a>
+            </div>
+            <div class="visit-action-wrap" id="visitEmailCard">
+              <a class="visit-action" id="visitEmailBtn" href="#" aria-label="Send an email">
+                <span class="va-icon"><i class="fa-solid fa-envelope"></i></span>
+                <span class="va-text"><span class="va-label">Email</span><span class="va-value" id="visitEmail">…</span></span>
+                <i class="fa-solid fa-chevron-right va-arrow"></i>
+              </a>
+            </div>
+          </div>
+          <!-- Shown only when APP.timings in constants.js has rows -->
+          <div class="visit-timings" id="visitTimingsCard" style="display:none;">
+            <div class="visit-timings-head"><i class="fa-regular fa-clock"></i> Darshan &amp; Aarti Timings</div>
+            <ul id="visitTimings"></ul>
+          </div>
         </div>
-        <div class="visit-card" id="visitWhatsappCard">
-          <div class="visit-icon is-whatsapp"><i class="fa-brands fa-whatsapp"></i></div>
-          <div class="visit-label">WhatsApp</div>
-          <div class="visit-value">Message us anytime</div>
-          <a class="visit-btn is-whatsapp" id="visitWhatsappBtn" href="#" target="_blank" rel="noopener noreferrer">
-            <i class="fa-brands fa-whatsapp"></i> Chat on WhatsApp
-          </a>
-        </div>
-        <div class="visit-card" id="visitEmailCard">
-          <div class="visit-icon"><i class="fa-solid fa-envelope"></i></div>
-          <div class="visit-label">Email</div>
-          <div class="visit-value" id="visitEmail">…</div>
-          <a class="visit-btn" id="visitEmailBtn" href="#"><i class="fa-solid fa-envelope"></i> Send Email</a>
-        </div>
-        <!-- Shown only when APP.timings in constants.js has rows -->
-        <div class="visit-card visit-timings" id="visitTimingsCard" style="display:none;">
-          <div class="visit-icon"><i class="fa-regular fa-clock"></i></div>
-          <div class="visit-label">Darshan &amp; Aarti Timings</div>
-          <ul id="visitTimings"></ul>
-        </div>
+
       </div>
     </div>
 
@@ -639,7 +667,7 @@
       <div class="sd-line"></div>
     </div>
 
-    <!-- Feedback Section: Map Left + Form Right -->
+    <!-- Feedback Section -->
     <div class="feedback-section reveal" id="feedbackSection">
       <h2>
         <i class="fa-solid fa-comment-dots" style="color: var(--color-brand); margin-right: 8px"></i>
@@ -649,23 +677,7 @@
 
       <div class="feedback-layout">
 
-        <!-- LEFT: Google Map -->
-        <div class="feedback-map-side">
-          <div class="feedback-map-header">
-            <i class="fa-solid fa-location-dot"></i>
-            <span id="mapHeaderText">…</span>
-          </div>
-          <iframe
-            id="mapEmbedFrame"
-            src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3273.497389457402!2d82.20519597492734!3d26.321060585267084!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x399a790bd4e8dff3%3A0x93c61c2049ae55f2!2sHanuman%20Mandir!5e1!3m2!1sen!2sin!4v1775203315104!5m2!1sen!2sin"
-            allowfullscreen=""
-            loading="lazy"
-            referrerpolicy="no-referrer-when-downgrade"
-            title="…">
-          </iframe>
-        </div>
-
-        <!-- RIGHT: Feedback Form -->
+        <!-- Feedback Form -->
         <div class="feedback-form" id="feedbackFormBox">
           <div class="feedback-form-title">
             <i class="fa-solid fa-paper-plane"></i> Send Us Your Message
@@ -682,7 +694,7 @@
               <span class="field-error-msg"></span>
             </div>
           </div>
-          <label>Address</label>
+          <label>Address <span class="opt-tag">(optional)</span></label>
           <input id="fb_address" placeholder="Village / City" />
           <label>Your Message / Suggestion <span style="color: var(--error-text)">*</span></label>
           <textarea id="fb_message" placeholder="Share your feedback, ideas or suggestions for improvement..."></textarea>
@@ -709,10 +721,20 @@
 
     </main>
 
-    <div class="footer" id="pageFooter">
-      © 2026 Mandir System | Built with <span>❤️</span>
-      <span class="footer-tagline" id="footerTagline">…</span>
-    </div>
+    <footer class="footer" id="pageFooter">
+      <div class="footer-inner">
+        <div class="footer-brand"><img src="Image/logo.webp" alt="" class="footer-logo" onerror="this.style.display='none'"><span>© 2026 Mandir System | Built with <span class="footer-heart">❤️</span></span></div>
+        <span class="footer-tagline" id="footerTagline">…</span>
+        <div class="footer-credit">Developed by <a href="https://www.linkedin.com/in/amarjeetvish/" target="_blank" rel="noopener noreferrer">Amarjeet Vishwakarma</a></div>
+      </div>
+    </footer>
+
+    <!-- Mobile sticky action bar (phones only; hrefs mirrored from the Visit section) -->
+    <nav class="mobile-action-bar" id="mobileActionBar" aria-label="Quick actions">
+      <a href="#visitSection" id="mabCall"><i class="fa-solid fa-phone"></i><span>Call</span></a>
+      <a href="#visitSection" id="mabDirections" target="_blank" rel="noopener noreferrer"><i class="fa-solid fa-diamond-turn-right"></i><span>Directions</span></a>
+      <button type="button" class="mab-donate" onclick="openPayModal()"><i class="fa-solid fa-hand-holding-heart"></i><span>Donate</span></button>
+    </nav>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Swiper/11.0.5/swiper-bundle.min.js"></script>
     <script src="constants.js"></script>
@@ -811,7 +833,42 @@
 
         // Footer full line
         var pf = document.getElementById('pageFooter');
-        if (pf) pf.innerHTML = '&copy; ' + new Date().getFullYear() + ' ' + shortName + ' | Built with <span>&#10084;&#65039;</span><span class="footer-tagline" id="footerTagline">॥ ' + tagline + ' ॥ — Serving the community with faith &amp; devotion</span>';
+        if (pf) pf.innerHTML = '<div class="footer-inner">' +
+          '<div class="footer-brand"><img src="Image/logo.webp" alt="" class="footer-logo" onerror="this.style.display=\'none\'"><span>&copy; ' + new Date().getFullYear() + ' ' + shortName + ' | Built with <span class="footer-heart">&#10084;&#65039;</span></span></div>' +
+          '<span class="footer-tagline" id="footerTagline">॥ ' + tagline + ' ॥ — Serving the community with faith &amp; devotion</span>' +
+          '<div class="footer-credit">Developed by <a href="https://www.linkedin.com/in/amarjeetvish/" target="_blank" rel="noopener noreferrer">Amarjeet Vishwakarma</a></div>' +
+          '</div>';
+
+        // Mobile action bar: mirror the links already set by initVisitSection (display only)
+        function syncActionBar() {
+          var map = [['mabCall','visitCallBtn'],['mabDirections','visitDirections']];
+          map.forEach(function(p) {
+            var t = document.getElementById(p[0]), src = document.getElementById(p[1]);
+            if (!t || !src) return;
+            var h = src.getAttribute('href');
+            if (h && h !== '#') t.setAttribute('href', h); else t.style.display = 'none';
+          });
+        }
+        window.addEventListener('load', function() { setTimeout(syncActionBar, 50); });
+      })();
+    </script>
+    <script>
+      /* Mobile action bar: slides in once the visitor scrolls past the top banner (display only) */
+      (function () {
+        var root = document.documentElement;
+        root.classList.add('mab-js');           // without JS the bar simply stays visible
+        var hero = document.getElementById('hero') || document.getElementById('home');
+        var ticking = false;
+        function update() {
+          ticking = false;
+          var limit = hero ? Math.max(hero.offsetHeight * 0.6, 160) : 360;
+          document.body.classList.toggle('mab-on', (window.pageYOffset || root.scrollTop) > limit);
+        }
+        window.addEventListener('scroll', function () {
+          if (!ticking) { ticking = true; requestAnimationFrame(update); }
+        }, { passive: true });
+        window.addEventListener('load', update);
+        update();
       })();
     </script>
     <script src="config.js"></script>

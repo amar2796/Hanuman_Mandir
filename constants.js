@@ -66,7 +66,7 @@
       /* ── CONTACT ───────────────────────────────────────────────────────
          Displayed in emails, chatbot, and admin settings panel.
          These are NOT synced to appscript — frontend-only. */
-      phone:   "+918127991402",
+      phone:   "+919819841147",
       email:   "hanumanmandirpaliya@gmail.com",
       website: "https://amar2796.github.io/Hanuman_Mandir/",
 
@@ -76,7 +76,10 @@
            { label: "Morning Aarti", time: "6:00 AM" },
            { label: "Evening Aarti", time: "7:00 PM" },
          Frontend-only (not synced to appscript). */
-      timings: [],
+      timings: [
+        { label: "Morning Aarti", time: "6:00 AM" },
+        { label: "Evening Aarti", time: "7:00 PM" },
+      ],
     
     
       /* ── HOMEPAGE DISPLAY ──────────────────────────────────────────────

@@ -424,7 +424,6 @@ var _trLoaded = false;
         if (!siteTop) return;
         var h = siteTop.offsetHeight;
         document.body.style.paddingTop = h + "px";
-        document.documentElement.style.scrollPaddingTop = h + "px"; /* anchor links land just below header + banner */
         var navMenu = document.getElementById("navMenu");
         if (navMenu) navMenu.style.top = h + "px";
       }
@@ -453,8 +452,25 @@ var _trLoaded = false;
           $("visitAddress").textContent = (APP.name ? APP.name + ", " : "") + addr + (APP.pin ? " – " + APP.pin : "");
           // exact pin from the map embed URL (…!2d<lng>!3d<lat>…), else search by address
           var dir = "";
-          var m = String(APP.mapEmbedUrl || "").match(/!2d(-?\d+(?:\.\d+)?)!3d(-?\d+(?:\.\d+)?)/);
-          if (m) dir = "https://www.google.com/maps/dir/?api=1&destination=" + m[2] + "," + m[1];
+          var embed = String(APP.mapEmbedUrl || "");
+          var m = embed.match(/!2d(-?\d+(?:\.\d+)?)!3d(-?\d+(?:\.\d+)?)/);
+          // Best: the place id of the mandir itself (embed holds it as !1s0x<hex>:0x<hex>), so Directions
+          // ends exactly on the "Hanuman Mandir" pin, not on the map-centre coordinates.
+          var fid = embed.match(/!1s(0x[0-9a-f]+)(?::|%3A)(0x[0-9a-f]+)/i);
+          var placeId = "";
+          if (fid) {
+            try {
+              var bytes = [0x0a, 0x12];
+              [fid[1], fid[2]].forEach(function (h, i) {
+                bytes.push(i === 0 ? 0x09 : 0x11);
+                var x = h.slice(2); while (x.length < 16) x = "0" + x;
+                for (var k = 14; k >= 0; k -= 2) bytes.push(parseInt(x.substr(k, 2), 16));
+              });
+              placeId = btoa(String.fromCharCode.apply(null, bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+            } catch (e) { placeId = ""; }
+          }
+          if (placeId) dir = "https://www.google.com/maps/dir/?api=1&destination=" + encodeURIComponent(APP.name || "Mandir") + "&destination_place_id=" + placeId;
+          else if (m) dir = "https://www.google.com/maps/dir/?api=1&destination=" + m[2] + "," + m[1];
           else dir = "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent((APP.name || "") + " " + addr);
           $("visitDirections").href = dir;
         } else { hide("visitAddressCard"); }
@@ -555,6 +571,17 @@ var _trLoaded = false;
           dots[_memberIdx].classList.add('active');
         }, 300);
       }
+      // Warm the cache + decode every member photo up-front. Hidden cards (display:none) are never
+      // painted, so their photos used to decode only at the moment of the switch (dark/blurred flash).
+      document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('.member-avatar').forEach(function(img) {
+          var src = img.getAttribute('src'); if (!src) return;
+          var pre = new Image();
+          pre.decoding = 'async';
+          pre.src = src;
+          if (pre.decode) pre.decode().catch(function(){});
+        });
+      });
       function memberNav(dir) { memberGoTo(_memberIdx + dir); }
       function resetMemberAutoplay() {
         clearInterval(_memberAutoplay);
@@ -657,28 +684,6 @@ var _trLoaded = false;
       window.addEventListener("scroll", reveal);
       reveal();
 
-      /* Reading-progress line (decorative, one rAF-throttled passive listener) */
-      (function () {
-        try {
-          var bar = document.createElement("div");
-          bar.id = "scrollProgress";
-          bar.setAttribute("aria-hidden", "true");
-          document.body.appendChild(bar);
-          var ticking = false;
-          function paint() {
-            ticking = false;
-            var max = document.documentElement.scrollHeight - window.innerHeight;
-            var p = max > 0 ? Math.min(1, Math.max(0, window.pageYOffset / max)) : 0;
-            bar.style.transform = "scaleX(" + p + ")";
-          }
-          window.addEventListener("scroll", function () {
-            if (!ticking) { ticking = true; window.requestAnimationFrame(paint); }
-          }, { passive: true });
-          window.addEventListener("resize", paint, { passive: true });
-          paint();
-        } catch (e) { /* never block the page for a decorative bar */ }
-      })();
-
       /* Floating Ram */
       function createFloatingRam() {
         const heroSection = document.querySelector(".hero");
@@ -737,14 +742,51 @@ var _trLoaded = false;
           if (next && next.classList.contains('field-error-msg')) next.classList.remove('show');
         });
       }
-      // Live clear error on input
+      /* ── Mobile number: normalise + validate (Indian mobile, 10 digits, starts 6-9) ── */
+      function _fbNormMobile(v) {
+        var raw = String(v || '').trim();
+        var d = raw.replace(/\D/g, '');                      // digits only (drops spaces, +, -, brackets)
+        if (raw.charAt(0) === '+' && d.indexOf('91') === 0) d = d.slice(2);   // typed "+91" = country code
+        if (d.length > 10 && d.indexOf('91') === 0) d = d.slice(2);   // +91 / 91 prefix
+        else if (d.length > 10 && d.charAt(0) === '0') d = d.slice(1); // leading 0
+        return d.slice(0, 10);
+      }
+      function _fbMobileError(d) {
+        if (!d) return 'Please enter your mobile number.';
+        if (d.length < 10) return 'Mobile number must be 10 digits (' + d.length + '/10).';
+        if (!/^[6-9]/.test(d)) return 'Mobile number must start with 6, 7, 8 or 9.';
+        if (/^(\d)\1{9}$/.test(d)) return 'Please enter a real mobile number.';
+        return '';
+      }
+      // Live validation
       document.addEventListener('DOMContentLoaded', function() {
-        ['fb_name','fb_mobile','fb_message'].forEach(function(id) {
+        ['fb_name','fb_message'].forEach(function(id) {
           var el = document.getElementById(id);
           if (el) el.addEventListener('input', function() {
             if (el.value.trim()) _fbClearError(id);
           });
         });
+        var mob = document.getElementById('fb_mobile');
+        if (mob) {
+          mob.setAttribute('inputmode', 'numeric');
+          mob.setAttribute('autocomplete', 'tel-national');
+          mob.setAttribute('maxlength', '15');   // room to paste "+91 98765 43210"; trimmed to 10 on input
+          mob.addEventListener('input', function() {
+            var typed = mob.value.replace(/[^\d+\s-]/g, '');          // no letters/symbols; keep + and spaces while typing
+            var clean = _fbNormMobile(typed);
+            if (typed.replace(/\D/g, '').length > 10) typed = clean;   // paste of +91… / 0… / long number -> tidy to 10 digits
+            if (mob.value !== typed) mob.value = typed;
+            if (!_fbMobileError(clean)) _fbClearError('fb_mobile');
+            else if (mob.classList.contains('input-error')) _fbSetError('fb_mobile', _fbMobileError(clean));
+          });
+          mob.addEventListener('blur', function() {
+            if (mob.value) {
+              mob.value = _fbNormMobile(mob.value);
+              var err = _fbMobileError(mob.value);
+              if (err) _fbSetError('fb_mobile', err);
+            }
+          });
+        }
       });
 
       /* FIX #1 & #3: Feedback submit — with inline validation */
@@ -760,11 +802,10 @@ var _trLoaded = false;
           _fbSetError('fb_name', 'Please enter your full name.');
           valid = false;
         }
-        if (!mobile) {
-          _fbSetError('fb_mobile', 'Please enter your mobile number.');
-          valid = false;
-        } else if (!/^\d{10}$/.test(mobile.replace(/\s/g,''))) {
-          _fbSetError('fb_mobile', 'Enter a valid 10-digit mobile number.');
+        mobile = _fbNormMobile(mobile);
+        var mobErr = _fbMobileError(mobile);
+        if (mobErr) {
+          _fbSetError('fb_mobile', mobErr);
           valid = false;
         }
         if (!message) {

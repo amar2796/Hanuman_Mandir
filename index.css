@@ -2965,144 +2965,453 @@ body { background: linear-gradient(135deg, var(--bg-page) 0%, #FBF3E6 100%); }
 /* Footer: gold-cream text on the dark maroon (was dim orange) */
 .footer { color: rgba(251,235,200,0.85); }
 .footer .footer-tagline { color: rgba(212,175,55,0.85); }   /* '.footer span' (specificity 0,1,1) was winning */
-/* ══════════════════════════════════════════════════════════════════════
-   HOME PAGE — PREMIUM POLISH (appended last; theme colours unchanged)
-   Everything below only uses the existing palette tokens. Rules are
-   additive: animations are one-time (nothing loops), use transform /
-   opacity only, and are switched off by the reduced-motion block at the
-   very end of this section.
-   ══════════════════════════════════════════════════════════════════════ */
 
-/* 1 · Anchor links: the header is fixed, so section links (Features,
-      Feedback, …) used to scroll the heading UNDER the header.
-      This leaves a little breathing room below it on every screen. */
-html { scroll-padding-top: 64px; }
-@media (max-width: 768px) { html { scroll-padding-top: 52px; } }
-/* (index.js overwrites this with the exact header + announcement-banner height) */
+/* ═══════════════════════════════════════════════════════════════════
+   PREMIUM POLISH v3 — Visit section, Feedback, Footer, Mobile bar
+   Same maroon / rust / gold palette. Cards match the "System Features"
+   cards (glass surface, gold hairline, 3px rust top edge, 20px radius).
+   Desktop + tablet + phone. Markup/CSS only — no logic touched.
+   ═══════════════════════════════════════════════════════════════════ */
 
-/* 2 · Splash: 100vh is taller than the visible area on phones (browser
-      bar). dvh follows the real visible height; older browsers ignore
-      this line and keep the 100vh above. */
-#splash-screen { height: 100dvh; }
-
-/* 4 · Mobile menu: on a phone held sideways the list was taller than the
-      screen and the page behind is locked, so Donate / Login could not be
-      reached. The menu now scrolls inside itself when it needs to. */
-.nav-menu {
-  max-height: calc(100dvh - 110px);
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  -webkit-overflow-scrolling: touch;
+/* ── shared premium card surface ── */
+.visit-map-card,
+.visit-action,
+.visit-timings,
+.feedback-form {
+  background: rgba(255,255,255,0.86);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(212,175,55,0.38);
+  border-top: 3px solid rgba(193,68,14,0.55);
+  border-radius: 20px;
+  box-shadow: 0 8px 26px rgba(122,31,31,0.08);
 }
 
-/* 5 · Entrance animation (one-time, staggered) ─────────────────────── */
-@keyframes polishRise {
-  from { opacity: 0; transform: translateY(22px) scale(0.97); }
+/* ══ VISIT THE MANDIR ══ */
+.visit-layout {
+  display: grid;
+  grid-template-columns: minmax(0,1.45fr) minmax(0,1fr);
+  gap: 24px;
+  max-width: 1100px;
+  margin: 36px auto 0;
+  text-align: left;
+  align-items: stretch;
 }
-@keyframes polishRule {
-  from { opacity: 0; transform: scaleX(0); }
+.visit-map-card {
+  display: flex; flex-direction: column;
+  overflow: hidden; padding: 0;
+  transition: box-shadow .35s ease, border-color .35s ease;
 }
-@keyframes polishPop {
-  from { opacity: 0; transform: scale(0.4) rotate(-18deg); }
+.visit-map-card:hover { box-shadow: 0 18px 40px rgba(193,68,14,0.16); border-top-color: var(--color-brand); }
+.visit-map-frame { position: relative; flex: 1; min-height: 340px; background: #efe6d6; }
+.visit-map-frame iframe {
+  position: absolute; inset: 0; width: 100%; height: 100%; min-height: 0; border: 0; display: block;
 }
-@keyframes polishLine {
-  from { opacity: 0; transform: scaleX(0); }
+.visit-map-bar {
+  display: flex; align-items: center; justify-content: space-between; gap: 14px;
+  padding: 16px 20px;
+  background: linear-gradient(180deg, #fffdf8, #fff6e6);
+  border-top: 1px solid rgba(212,175,55,0.35);
 }
-@keyframes polishNavIn {
-  from { opacity: 0; transform: translateX(-14px); }
+.visit-map-info { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.visit-pin {
+  flex: 0 0 auto; width: 42px; height: 42px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: #fff; font-size: 1rem;
+  background: linear-gradient(135deg, var(--color-brand), var(--color-primary-dark));
+  box-shadow: 0 4px 12px rgba(122,31,31,0.28);
+}
+.visit-map-text { min-width: 0; }
+.visit-map-text .visit-label { margin: 0 0 2px; }
+.visit-map-text .visit-value { font-size: 0.92rem; line-height: 1.45; }
+.visit-map-bar .visit-btn { margin: 0; flex: 0 0 auto; white-space: nowrap; padding: 11px 20px; }
+
+.visit-side { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.visit-actions { display: grid; grid-auto-flow: row; gap: 14px; }
+.visit-action-wrap { display: block; min-width: 0; }
+.visit-action {
+  position: relative; overflow: hidden;
+  display: flex; align-items: center; gap: 14px;
+  padding: 16px 18px; min-height: 76px;
+  text-decoration: none; color: inherit;
+  transition: transform .3s cubic-bezier(.34,1.4,.64,1), box-shadow .3s ease, border-color .3s ease;
+}
+.visit-action::before {            /* same shimmer sweep as .card */
+  content: ''; position: absolute; top: 0; left: -80%; width: 55%; height: 100%;
+  background: linear-gradient(105deg, transparent 30%, rgba(193,68,14,0.07) 50%, transparent 70%);
+  transition: left .6s ease; pointer-events: none;
+}
+.visit-action:hover::before { left: 130%; }
+.visit-action:hover, .visit-action:focus-visible {
+  transform: translateY(-4px);
+  box-shadow: 0 16px 34px rgba(193,68,14,0.18);
+  border-top-color: var(--color-brand);
+  outline: none;
+}
+.visit-action:active { transform: translateY(-1px) scale(.99); }
+.va-icon {
+  flex: 0 0 auto; width: 46px; height: 46px; border-radius: 14px;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: #fff; font-size: 1.15rem;
+  background: linear-gradient(135deg, var(--color-brand), var(--color-primary-dark));
+  box-shadow: 0 4px 12px rgba(122,31,31,0.28);
+}
+.visit-action.is-whatsapp .va-icon { background: linear-gradient(135deg,#25D366,#128C7E); box-shadow: 0 4px 12px rgba(18,140,126,0.3); }
+.va-text { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.va-label { font-size: 0.7rem; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; color: var(--color-brand); }
+.va-value { font-size: 0.95rem; font-weight: 500; color: var(--polish-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.va-arrow { color: var(--color-gold); font-size: .8rem; transition: transform .25s ease; }
+.visit-action:hover .va-arrow { transform: translateX(4px); color: var(--color-brand); }
+
+/* Timings — styled as swipeable chips (filled from APP.timings) */
+.visit-timings { display: block; padding: 16px 18px; text-align: left; }
+.visit-timings-head { font-size: .72rem; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; color: var(--color-brand); margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+.visit-timings ul {
+  list-style: none; margin: 0; padding: 0;
+  display: flex; flex-wrap: wrap; gap: 10px;
+}
+.visit-timings li {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 10px 14px; border: 1px solid rgba(212,175,55,0.45); border-bottom: 1px solid rgba(212,175,55,0.45);
+  border-radius: 14px; background: linear-gradient(180deg,#fffdf8,#fff3dc);
+  font-size: .8rem; color: var(--polish-muted);
+}
+.visit-timings li span:last-child { font-size: .95rem; font-weight: 700; color: var(--color-primary-dark); white-space: nowrap; }
+
+/* ══ FEEDBACK — single premium card (map moved to Visit) ══ */
+.feedback-layout { grid-template-columns: minmax(0,1fr); max-width: 720px; }
+.feedback-form { padding: 34px 32px; }
+.feedback-form-title { color: var(--color-primary-dark); font-weight: 700; }
+.feedback-form .opt-tag, .opt-tag { font-weight: 500; font-size: .78em; color: var(--polish-faint); }
+.feedback-submit-btn { width: 100%; border-radius: 14px; }
+
+/* ══ FOOTER — complete, centred, wraps on every width ══ */
+.footer {
+  padding: 36px 20px 30px;
+  font-size: .9rem; line-height: 1.5;
+  background: linear-gradient(160deg, #1A0A0A 0%, #3D0F0F 55%, #1A0A0A 100%);
+}
+.footer-inner { max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.footer-brand { display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; color: rgba(251,235,200,0.92); font-weight: 500; }
+.footer-logo { width: 34px; height: 34px; border-radius: 50%; object-fit: cover; box-shadow: 0 0 0 2px rgba(212,175,55,0.55); }
+.footer .footer-brand span, .footer .footer-heart { color: inherit; }
+.footer .footer-tagline {
+  display: block !important;               /* no longer hidden on small screens */
+  margin: 0; font-size: .8rem; letter-spacing: .4px;
+  color: rgba(212,175,55,0.9);
+  overflow-wrap: anywhere; text-wrap: balance;
+}
+.footer-credit {
+  margin-top: 6px; padding-top: 14px; width: 100%; max-width: 420px;
+  border-top: 1px solid rgba(212,175,55,0.25);
+  font-size: .8rem; color: rgba(251,235,200,0.7);
+}
+.footer-credit a {
+  color: var(--color-gold); font-weight: 600; text-decoration: none;
+  border-bottom: 1px solid rgba(212,175,55,0.5); padding-bottom: 1px;
+  transition: color .2s, border-color .2s;
+}
+.footer-credit a:hover, .footer-credit a:focus-visible { color: var(--color-gold-soft); border-color: rgba(251,235,200,0.8); outline: none; }
+
+/* ══ MOBILE ACTION BAR (hidden on tablet/desktop) ══ */
+.mobile-action-bar { display: none; }
+
+/* ══ TABLET ══ */
+@media (max-width: 900px) {
+  .visit-layout { grid-template-columns: minmax(0,1fr); gap: 18px; }
+  .visit-map-frame { min-height: 300px; }
+  .visit-actions { grid-auto-flow: column; grid-auto-columns: minmax(0,1fr); }
+  .visit-action { flex-direction: column; text-align: center; justify-content: center; gap: 8px; padding: 16px 10px; }
+  .va-text { align-items: center; flex: 0 1 auto; max-width: 100%; }
+  .va-arrow { display: none; }
 }
 
-/* about tiles, feature cards, visit cards, live-count card: rise in one
-   after another when their section scrolls into view.
-   (fill-mode "backwards" only — after the animation ends the normal hover
-   effects keep working.) */
-.reveal.active .about-stat,
-.reveal.active .cards .card,
-.reveal.active .visit-card,
-.reveal.active .cs-card {
-  animation: polishRise 0.65s cubic-bezier(0.22, 1, 0.36, 1) backwards;
-}
-.reveal.active .about-stat:nth-child(1), .reveal.active .cards .card:nth-child(1), .reveal.active .visit-card:nth-child(1), .reveal.active .cs-card { animation-delay: 0.12s; }
-.reveal.active .about-stat:nth-child(2), .reveal.active .cards .card:nth-child(2), .reveal.active .visit-card:nth-child(2) { animation-delay: 0.20s; }
-.reveal.active .about-stat:nth-child(3), .reveal.active .cards .card:nth-child(3), .reveal.active .visit-card:nth-child(3) { animation-delay: 0.28s; }
-.reveal.active .about-stat:nth-child(4), .reveal.active .cards .card:nth-child(4), .reveal.active .visit-card:nth-child(4) { animation-delay: 0.36s; }
-.reveal.active .visit-card:nth-child(5) { animation-delay: 0.44s; }
+/* ══ PHONE ══ */
+@media (max-width: 700px) {
+  .section { padding: 44px 16px; }
+  .section h2, .feedback-section h2 { font-size: clamp(1.4rem, 6vw, 1.7rem); }
 
-/* gold underline under each section heading draws itself */
-.section.reveal.active h2::after,
-.feedback-section.reveal.active h2::after {
-  animation: polishRule 0.7s ease-out 0.3s backwards;
-}
+  /* Visit */
+  .visit-layout { margin-top: 24px; gap: 14px; }
+  .visit-map-card, .visit-action, .visit-timings, .feedback-form { border-radius: 18px; }
+  .visit-map-frame { min-height: 230px; }
+  .visit-map-bar { flex-direction: column; align-items: stretch; gap: 12px; padding: 14px 16px 16px; }
+  .visit-map-bar .visit-btn { width: 100%; justify-content: center; padding: 13px 18px; font-size: .92rem; }
+  .visit-actions { gap: 10px; }
+  .visit-action { padding: 14px 6px; min-height: 0; gap: 8px; }
+  .va-icon { width: 42px; height: 42px; border-radius: 12px; }
+  .va-label { font-size: .68rem; letter-spacing: .06em; }
+  .va-value { display: none; }                /* compact tiles: label + icon only */
+  .visit-timings ul { flex-wrap: nowrap; overflow-x: auto; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; padding-bottom: 6px; margin: 0 -4px; padding-left: 4px; scrollbar-width: none; }
+  .visit-timings ul::-webkit-scrollbar { display: none; }
+  .visit-timings li { flex: 0 0 auto; scroll-snap-align: start; }
 
-/* ornament dividers: the two lines grow outward, the symbol pops in */
-.section-divider.reveal.active .sd-line { animation: polishLine 0.9s ease-out backwards; }
-.section-divider.reveal.active .sd-line:first-child { transform-origin: right center; }
-.section-divider.reveal.active .sd-line:last-child  { transform-origin: left center; }
-.section-divider.reveal.active .sd-symbol { animation: polishPop 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) 0.2s backwards; }
-
-/* mobile menu items glide in one by one each time the menu opens */
-.nav-menu.open a { animation: polishNavIn 0.34s ease-out backwards; }
-.nav-menu.open a:nth-child(1) { animation-delay: 0.02s; }
-.nav-menu.open a:nth-child(2) { animation-delay: 0.06s; }
-.nav-menu.open a:nth-child(3) { animation-delay: 0.10s; }
-.nav-menu.open a:nth-child(4) { animation-delay: 0.14s; }
-.nav-menu.open a:nth-child(5) { animation-delay: 0.18s; }
-.nav-menu.open a:nth-child(6) { animation-delay: 0.22s; }
-.nav-menu.open a:nth-child(7) { animation-delay: 0.26s; }
-.nav-menu.open a:nth-child(8) { animation-delay: 0.30s; }
-
-/* 6 · Touch screens: hover effects "stick" after a tap on phones (the card
-      stays lifted until you tap elsewhere). Here the lift is replaced by a
-      quick press-in feedback that springs back when the finger lifts. */
-@media (hover: none) {
-  .card:hover {
-    transform: none;
-    box-shadow: 0 8px 26px rgba(122,31,31,0.08);
-    border-color: rgba(193,68,14,0.18);
-    border-top-color: rgba(193,68,14,0.55);
+  /* Feature cards: swipe row instead of a tall stack */
+  .cards {
+    display: flex; grid-template-columns: none; gap: 12px;
+    overflow-x: auto; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch;
+    margin: 22px -16px 0; padding: 6px 16px 18px;
+    scroll-padding: 0 16px; scrollbar-width: none;
   }
-  .card:hover::before { left: -80%; }
-  .card:hover h3 i { transform: none; filter: drop-shadow(0 0 0px rgba(193,68,14,0)); }
-  .about-stat:hover { transform: none; box-shadow: 0 6px 22px rgba(122,31,31,0.09), inset 0 1px 0 rgba(255,255,255,0.9); }
-  .visit-card:hover { transform: none; box-shadow: 0 6px 24px rgba(122,31,31,0.10); }
+  .cards::-webkit-scrollbar { display: none; }
+  .cards .card { flex: 0 0 76%; max-width: 300px; scroll-snap-align: start; text-align: left; }
+  .cards .card:hover { transform: none; }
 
-  .card:active,
-  .about-stat:active,
-  .visit-card:active { transform: scale(0.98); }
-  .visit-btn:active,
-  .feedback-submit-btn:active,
-  .members-nav-btn:active,
-  .hamburger-btn:active,
-  .audio-btn:active,
-  .login-nav-links a:active { transform: scale(0.95); }
+  /* Feedback */
+  .feedback-section { padding: 44px 16px; }
+  .feedback-form { padding: 22px 16px; }
+  .feedback-form input, .feedback-form textarea { font-size: 16px; }   /* stops iOS zoom-on-focus */
+
+  /* Footer: always readable, clears the bar + floating buttons */
+  .footer { padding: 30px 16px calc(136px + env(safe-area-inset-bottom, 0px)); font-size: .85rem; }
+  .footer .footer-tagline { font-size: .75rem; }
+
+  /* Sticky bottom action bar */
+  .mobile-action-bar {
+    display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 8px;
+    position: fixed; left: 10px; right: 10px;
+    bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+    z-index: 1050; padding: 8px;
+    background: rgba(61,15,15,0.88);
+    -webkit-backdrop-filter: blur(16px) saturate(140%); backdrop-filter: blur(16px) saturate(140%);
+    border: 1px solid rgba(212,175,55,0.4); border-radius: 22px;
+    box-shadow: 0 12px 32px rgba(26,10,10,0.38);
+  }
+  .mobile-action-bar a, .mobile-action-bar button {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+    min-height: 50px; border: 0; border-radius: 16px; cursor: pointer;
+    background: transparent; color: rgba(251,235,200,0.92);
+    font-family: inherit; font-weight: 600; font-size: .72rem; line-height: 1; text-decoration: none;
+    -webkit-tap-highlight-color: transparent; transition: background .2s, transform .15s;
+  }
+  .mobile-action-bar i { font-size: 1.05rem; color: var(--color-gold); }
+  .mobile-action-bar a:active, .mobile-action-bar button:active { transform: scale(.96); background: rgba(255,255,255,0.08); }
+  .mobile-action-bar .mab-donate { background: linear-gradient(135deg, var(--color-brand), var(--color-primary)); color: #fff; box-shadow: 0 4px 14px rgba(193,68,14,0.4); }
+  .mobile-action-bar .mab-donate i { color: #fff; }
+
+  /* Lift floating music + chat buttons above the bar */
+  .audio-btn { bottom: calc(84px + env(safe-area-inset-bottom, 0px)) !important; left: 14px !important; width: 42px; height: 42px; }
+  #_mbotBtn { bottom: calc(86px + env(safe-area-inset-bottom, 0px)) !important; }
 }
 
-/* 7 · Thin gold reading-progress line at the very top of the page
-      (created by index.js; purely decorative, ignores taps). */
-#scrollProgress {
-  position: fixed;
-  top: 0; left: 0;
-  width: 100%; height: 3px;
-  z-index: 1200;
-  pointer-events: none;
-  transform-origin: left center;
-  transform: scaleX(0);
-  background: linear-gradient(90deg, var(--color-brand), var(--color-gold), var(--color-gold-soft));
-  box-shadow: 0 0 8px rgba(212,175,55,0.55);
-  will-change: transform;
+/* very small phones */
+@media (max-width: 360px) {
+  .visit-action { padding: 12px 4px; }
+  .va-label { font-size: .62rem; }
+  .mobile-action-bar a, .mobile-action-bar button { font-size: .68rem; }
 }
 
-/* 8 · Reduced motion: switch every animation added above off completely
-      (the global rule earlier only shortens them, it does not remove the
-      start delay). Content then simply shows. */
 @media (prefers-reduced-motion: reduce) {
-  .reveal.active .about-stat,
-  .reveal.active .cards .card,
-  .reveal.active .visit-card,
-  .reveal.active .cs-card,
-  .section.reveal.active h2::after,
-  .feedback-section.reveal.active h2::after,
-  .section-divider.reveal.active .sd-line,
-  .section-divider.reveal.active .sd-symbol,
-  .nav-menu.open a { animation: none; }
+  .visit-action, .visit-action::before, .visit-map-card { transition: none; }
+}
+
+/* desktop: contact cards share the full height of the map card */
+@media (min-width: 901px) {
+  .visit-actions { flex: 1; grid-auto-rows: 1fr; }
+  .visit-action { height: 100%; }
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   COMPACT + EYE-CATCH v4 — slimmer footer & action bar, small delights
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* Footer: tighter on every screen */
+.footer { padding: 26px 20px 22px; }
+.footer-inner { gap: 6px; }
+.footer-logo { width: 28px; height: 28px; }
+.footer-credit { margin-top: 4px; padding-top: 10px; font-size: .78rem; }
+.footer-heart { display: inline-block; animation: heartBeat 1.8s ease-in-out infinite; }
+@keyframes heartBeat { 0%,100% { transform: scale(1); } 15% { transform: scale(1.25); } 30% { transform: scale(1); } 45% { transform: scale(1.18); } }
+
+/* gold ornament on the footer's top edge */
+.footer::after {
+  content: '❖'; position: absolute; top: -9px; left: 50%; transform: translateX(-50%);
+  width: 34px; text-align: center; font-size: 12px; line-height: 18px;
+  color: var(--color-gold); background: transparent;
+  text-shadow: 0 0 8px rgba(212,175,55,0.6); top: 6px;
+}
+
+/* section headings: gold underline gently shimmers */
+.section h2::after, .feedback-section h2::after {
+  background-size: 200% 100%;
+  animation: goldSweep 4s linear infinite;
+}
+@keyframes goldSweep { 0% { background-position: 0% 0; } 100% { background-position: 200% 0; } }
+
+/* icon chips pop a little on hover */
+.va-icon, .visit-pin { transition: transform .3s cubic-bezier(.34,1.56,.64,1); }
+.visit-action:hover .va-icon { transform: scale(1.1) rotate(-4deg); }
+
+@media (max-width: 700px) {
+  /* slim footer; only needs to clear the slim bar */
+  .footer { padding: 22px 16px calc(74px + env(safe-area-inset-bottom, 0px)); font-size: .8rem; }
+  .footer .footer-tagline { font-size: .7rem; }
+  .footer-credit { font-size: .74rem; max-width: 340px; }
+
+  /* slim single-row action bar */
+  .mobile-action-bar { left: 12px; right: 12px; bottom: calc(8px + env(safe-area-inset-bottom, 0px)); padding: 5px; gap: 6px; border-radius: 18px; }
+  .mobile-action-bar a, .mobile-action-bar button {
+    flex-direction: row; gap: 7px; min-height: 40px; border-radius: 14px; font-size: .78rem;
+  }
+  .mobile-action-bar i { font-size: .95rem; }
+  /* Donate gets a soft pulsing glow to draw the eye */
+  .mobile-action-bar .mab-donate { animation: donateGlow 2.6s ease-in-out infinite; }
+
+  /* floating buttons sit just above the slim bar */
+  .audio-btn { bottom: calc(68px + env(safe-area-inset-bottom, 0px)) !important; width: 38px; height: 38px; left: 12px !important; }
+  #_mbotBtn { bottom: calc(68px + env(safe-area-inset-bottom, 0px)) !important; }
+}
+@keyframes donateGlow {
+  0%,100% { box-shadow: 0 4px 14px rgba(193,68,14,0.40); }
+  50%     { box-shadow: 0 4px 22px rgba(240,140,40,0.75), 0 0 0 3px rgba(212,175,55,0.18); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .footer-heart, .section h2::after, .feedback-section h2::after, .mobile-action-bar .mab-donate { animation: none; }
+}
+
+
+/* ═══ v5: bar slides in after the banner; clearer mobile error text ═══ */
+.field-error-msg { font-size: 12px; }
+@media (max-width: 700px) {
+  .mab-js .mobile-action-bar {
+    transform: translateY(140%); opacity: 0; pointer-events: none;
+    transition: transform .4s cubic-bezier(.22,1,.36,1), opacity .3s ease;
+  }
+  .mab-js body.mab-on .mobile-action-bar { transform: none; opacity: 1; pointer-events: auto; }
+  /* floating buttons drop back to the corner while the bar is hidden */
+  .mab-js .audio-btn, .mab-js #_mbotBtn { transition: bottom .35s ease; }
+  .mab-js body:not(.mab-on) .audio-btn { bottom: calc(18px + env(safe-area-inset-bottom, 0px)) !important; }
+  .mab-js body:not(.mab-on) #_mbotBtn  { bottom: calc(18px + env(safe-area-inset-bottom, 0px)) !important; }
+  /* footer only needs bar clearance when the bar can show */
+}
+@media (prefers-reduced-motion: reduce) { .mab-js .mobile-action-bar { transition: none; } }
+
+/* hide the bar while typing in a form (keeps fields and keyboard area clear) */
+@media (max-width: 700px) {
+  .mab-js body:has(input:focus, textarea:focus) .mobile-action-bar { transform: translateY(140%); opacity: 0; pointer-events: none; }
+  .mab-js body:has(input:focus, textarea:focus) .audio-btn,
+  .mab-js body:has(input:focus, textarea:focus) #_mbotBtn { bottom: calc(18px + env(safe-area-inset-bottom, 0px)) !important; }
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   VISIT v6 — one unified card: map → timings → contact dock
+   (phone + tablet; desktop keeps the two-column layout)
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* Timing tiles (all widths): deep-maroon with gold time, diya icon */
+.visit-timings { padding: 16px; }
+.visit-timings ul { display: grid !important; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; overflow: visible; margin: 0; padding: 0; }
+.visit-timings li {
+  position: relative; display: grid; grid-template-columns: auto 1fr; column-gap: 12px; align-items: center;
+  padding: 12px 14px; border: 1px solid rgba(212,175,55,0.45); border-radius: 16px;
+  background: linear-gradient(135deg, #7A1F1F 0%, #4A1010 100%);
+  box-shadow: 0 6px 16px rgba(74,16,16,0.25), inset 0 1px 0 rgba(255,255,255,0.12);
+  color: rgba(251,235,200,0.85); font-size: .74rem; letter-spacing: .04em; text-transform: uppercase;
+}
+.visit-timings li::before {
+  content: '🪔'; grid-row: 1 / span 2; font-size: 1.5rem; line-height: 1;
+  filter: drop-shadow(0 0 6px rgba(240,170,60,0.7));
+}
+.visit-timings li span:first-child { grid-column: 2; font-weight: 600; }
+.visit-timings li span:last-child  { grid-column: 2; font-size: 1.15rem; font-weight: 800; letter-spacing: 0; text-transform: none; color: var(--color-gold-soft, #F3D98B); white-space: nowrap; }
+
+@media (max-width: 900px) {
+  /* the whole section becomes ONE premium card */
+  .visit-layout {
+    gap: 0; overflow: hidden; margin-top: 24px;
+    background: rgba(255,255,255,0.9);
+    border: 1px solid rgba(212,175,55,0.4); border-top: 3px solid rgba(193,68,14,0.6);
+    border-radius: 22px; box-shadow: 0 14px 38px rgba(122,31,31,0.14);
+  }
+  .visit-layout .visit-map-card,
+  .visit-layout .visit-timings,
+  .visit-layout .visit-action {
+    background: transparent; border: 0; border-radius: 0; box-shadow: none;
+    -webkit-backdrop-filter: none; backdrop-filter: none;
+  }
+  .visit-layout .visit-map-card:hover { box-shadow: none; }
+  .visit-layout .visit-map-frame { min-height: 250px; }
+
+  /* address row: calm, no heavy button box */
+  .visit-layout .visit-map-bar { background: transparent; border-top: 0; padding: 16px 18px 6px; gap: 12px; }
+  .visit-layout .visit-map-bar .visit-btn { padding: 12px 18px; box-shadow: 0 6px 16px rgba(193,68,14,0.3); }
+
+  /* order inside the card: map → timings → contact dock */
+  .visit-layout .visit-side { gap: 0; }
+  .visit-layout .visit-timings { order: -1; padding: 12px 18px 16px; }
+  .visit-layout .visit-timings-head { margin-bottom: 10px; }
+
+  /* contact dock: three round icons, labels underneath, divider above */
+  .visit-layout .visit-actions {
+    display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0,1fr); gap: 0;
+    padding: 14px 8px 16px; border-top: 1px dashed rgba(193,68,14,0.28);
+  }
+  .visit-layout .visit-action { padding: 4px 4px; gap: 8px; min-height: 0; height: auto; transform: none; }
+  .visit-layout .visit-action:hover { transform: none; box-shadow: none; }
+  .visit-layout .visit-action:active .va-icon { transform: scale(.92); }
+  .visit-layout .va-icon { width: 52px; height: 52px; border-radius: 50%; font-size: 1.25rem; }
+  .visit-layout .va-label { font-size: .7rem; color: var(--polish-ink); letter-spacing: .05em; }
+  .visit-layout .va-value { display: none; }
+}
+
+@media (max-width: 700px) {
+  .visit-layout { border-radius: 20px; margin-left: -2px; margin-right: -2px; }
+  .visit-layout .visit-map-frame { min-height: 230px; }
+  .visit-timings ul { grid-template-columns: repeat(2, minmax(0,1fr)); }
+  .visit-timings li { padding: 11px 12px; column-gap: 10px; }
+  .visit-timings li::before { font-size: 1.3rem; }
+  .visit-timings li span:last-child { font-size: 1.05rem; }
+}
+@media (max-width: 700px) {
+  .visit-timings li { text-transform: none; letter-spacing: 0; font-size: .8rem; }
+  .visit-timings li span:first-child { white-space: nowrap; }
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   MEMBERS SLIDER v7 — photo + text are ready the moment a dot/arrow is used
+   • photo never starts transparent (it is preloaded + decoded, see index.js)
+   • quicker text stagger, so the info panel is never an empty box
+   • a designed initials backdrop sits behind every photo (also the fallback)
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* designed backdrop: initials always render behind the photo */
+.member-photo-side .member-avatar-placeholder {
+  display: flex !important;
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  margin: 0; border: 0; border-radius: 0; box-shadow: none;
+  align-items: center; justify-content: center; z-index: 1;
+  font-family: var(--font-display, serif); font-weight: 600; letter-spacing: .06em;
+  font-size: 3.4rem; color: rgba(243, 217, 139, 0.55);
+  background:
+    radial-gradient(circle at 50% 38%, rgba(212,175,55,0.22), transparent 55%),
+    linear-gradient(160deg, #3D0F0F 0%, #7A1F1F 55%, #C1440E 130%);
+  text-shadow: 0 2px 14px rgba(0,0,0,0.35);
+}
+.member-photo-side img.member-avatar { z-index: 2; background: transparent; }
+
+/* photo is visible immediately — only a gentle zoom, no fade from nothing */
+@keyframes memberImgZoom { from { transform: scale(1.06); } to { transform: none; } }
+@keyframes memberPhotoPop { from { transform: scale(0.94); } to { transform: none; } }
+.member-card.active .member-photo-side::after { animation-delay: .25s; }
+
+/* card slides in from a visible state, a touch faster */
+@keyframes memberSlideIn {
+  from { opacity: .35; transform: translateX(36px) scale(0.985); }
+  to   { opacity: 1;   transform: none; }
+}
+.member-card.active { animation-duration: .38s; }
+
+/* text follows right away (was 0.18s – 0.5s of empty panel) */
+.member-card.active .member-role-badge { animation-duration: .3s; animation-delay: .04s; }
+.member-card.active .member-name       { animation-duration: .3s; animation-delay: .08s; }
+.member-card.active .member-title      { animation-duration: .3s; animation-delay: .12s; }
+.member-card.active .member-divider    { animation-duration: .3s; animation-delay: .16s; }
+.member-card.active .member-bio        { animation-duration: .35s; animation-delay: .2s; }
+@keyframes memberTextIn { from { opacity: .0; transform: translateX(14px); } to { opacity: 1; transform: none; } }
+
+@media (max-width: 760px) {
+  .member-photo-side .member-avatar-placeholder { font-size: 2rem; }
 }
