@@ -234,26 +234,35 @@ const _U_NOTIF_DISMISSED = _U_PREFIX + "_notif_dismissed_ids"; // notification b
   // Max 10 entries — FIFO eviction to prevent unbounded heap growth
   window._photoB64Cache = {};
   window._photoB64CacheKeys = [];
+  // [FIX] In-flight de-duplication + max 3 concurrent photo requests (mandirQueued,
+  // app.js) — same reasoning as _fetchAdminPhotoBase64 in js/admin-core.js.
+  window._photoInflight = {};
   async function _fetchPhotoBase64(photoURL) {
     if (!photoURL) return null;
     if (window._photoB64Cache[photoURL]) return window._photoB64Cache[photoURL];
     const fileId = _extractDriveFileId(photoURL);
     if (!fileId) return null;
-    try {
-      const _s = JSON.parse(localStorage.getItem("session") || "null");
-      const res = await postData({ action: "getPhotoBase64", fileId: fileId, userId: _s?.userId || "", sessionToken: _s?.sessionToken || "" });
-      if (res && res.status === "success" && res.base64) {
-        // Evict oldest entry if cache is full
-        if (window._photoB64CacheKeys.length >= 10) {
-          var oldest = window._photoB64CacheKeys.shift();
-          delete window._photoB64Cache[oldest];
+    if (window._photoInflight[photoURL]) return window._photoInflight[photoURL];
+    const _job = mandirQueued(async function () {
+      try {
+        const _s = JSON.parse(localStorage.getItem("session") || "null");
+        const res = await postData({ action: "getPhotoBase64", fileId: fileId, userId: _s?.userId || "", sessionToken: _s?.sessionToken || "" });
+        if (res && res.status === "success" && res.base64) {
+          // Evict oldest entry if cache is full
+          if (window._photoB64CacheKeys.length >= 10) {
+            var oldest = window._photoB64CacheKeys.shift();
+            delete window._photoB64Cache[oldest];
+          }
+          window._photoB64Cache[photoURL] = res.base64;
+          window._photoB64CacheKeys.push(photoURL);
+          return res.base64;
         }
-        window._photoB64Cache[photoURL] = res.base64;
-        window._photoB64CacheKeys.push(photoURL);
-        return res.base64;
-      }
-    } catch (e) { /* fall through — initials will show */ }
-    return null;
+      } catch (e) { /* fall through — initials will show */ }
+      return null;
+    }).then(function (v) { delete window._photoInflight[photoURL]; return v; },
+            function (e) { delete window._photoInflight[photoURL]; return null; });
+    window._photoInflight[photoURL] = _job;
+    return _job;
   }
 
   // ── Smooth photo load: show initials instantly, fade in real photo when ready

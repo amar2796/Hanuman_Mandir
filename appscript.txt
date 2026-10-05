@@ -101,10 +101,16 @@ const SHEETS = {
 //  SessionTTL (30 min normally, 24h if "remember me" was checked at login).
 //  On tab/browser close, clearSessionToken is called via sendBeacon.
 // ════════════════════════════════════════════════════════════════
+// [FIX] Records WHY the last _verifySession() call returned false, so the
+// client can tell a definitive "session is gone" (blank / mismatch / expired)
+// apart from a transient server hiccup ("error") and only retry the latter.
+var _VS_LAST_REASON = "";
 function _verifySession(params, actionName) {
+  _VS_LAST_REASON = "";
   const userId = sanitize(params.userId || params.UserId || params.AdminName || "", 30);
   const token  = sanitize(params.sessionToken || params.token || "", 64);
   if (!token || !userId) {
+    _VS_LAST_REASON = "no_token";
     logAction(userId || "Unknown", "REJECTED_NO_TOKEN", "Action: " + actionName + " — missing session token or userId", "", "", { severity:"WARN", result:"BLOCKED" });
     return false;
   }
@@ -136,7 +142,7 @@ function _verifySession(params, actionName) {
     // unreachable in practice (the column is already part of every USERS
     // sheet this codebase creates), but fail-closed is the correct default
     // regardless of how unlikely the branch is to actually fire.
-    if (tokenCol === -1) return false;
+    if (tokenCol === -1) { _VS_LAST_REASON = "misconfigured"; return false; }
     const hashedToken = _hashSessionToken(token);
     for (let i = 1; i < allData.length; i++) {
       const rowId   = String(allData[i][headers.indexOf("UserId")] || allData[i][0] || "").trim();
@@ -160,12 +166,14 @@ function _verifySession(params, actionName) {
           // session always has a non-blank token (set by setSessionToken right after
           // login), so this only affects requests where the server thinks the user
           // is NOT currently logged in — exactly the case that should be rejected.
+          _VS_LAST_REASON = "blank";
           logAction(userId, "SESSION_TOKEN_MISMATCH", "Action: " + actionName + " — no active session (token blank)", "", "", { severity:"WARN", result:"BLOCKED" });
           return false;
         }
         // [SEC] SessionToken is stored as a SHA-256 hash, not plaintext — same
         // pattern as password auth. Compare hash-to-hash, never the raw value.
         if (!_safeCompare(stored, hashedToken)) {
+          _VS_LAST_REASON = "mismatch";
           logAction(userId, "SESSION_TOKEN_MISMATCH", "Action: " + actionName + " — token rejected", "", "", { severity:"WARN", result:"BLOCKED" });
           return false;
         }
@@ -178,6 +186,7 @@ function _verifySession(params, actionName) {
           if (expiryVal) {
             const expiryTime = expiryVal instanceof Date ? expiryVal.getTime() : Number(expiryVal);
             if (!isNaN(expiryTime) && expiryTime > 0 && Date.now() > expiryTime) {
+              _VS_LAST_REASON = "expired";
               logAction(userId, "SESSION_EXPIRED", "Action: " + actionName + " — session expired (server-side)", "", "", { severity:"WARN", result:"BLOCKED" });
               return false;
             }
@@ -229,9 +238,11 @@ function _verifySession(params, actionName) {
     // through instead of blocking it. A security check should fail CLOSED:
     // reject when uncertain, never allow. This is the same fix applied to
     // checkSession's catch block below, for consistency.
+    _VS_LAST_REASON = "error";
     logAction(userId || "Unknown", "VERIFY_SESSION_ERROR", "Action: " + actionName + " — " + e.message);
     return false;
   }
+  _VS_LAST_REASON = "not_found";
   return false; // user not found — reject (unknown userId should never pass session check)
 }
 
@@ -624,7 +635,14 @@ function sanitize(val, maxLen) {
 //  The 6th argument (opts) is optional and backward-compatible —
 //  all existing callers without opts continue to work unchanged.
 // ════════════════════════════════════════════════════════════════
+// [PERF] Master switch for the audit log. Set to false and redeploy to turn
+// audit writes off completely (nothing else in the app depends on it).
+var AUDIT_ENABLED    = true;
+var AUDIT_MAX_ROWS   = 100;   // audit log keeps the latest 100 rows
+var AUDIT_TRIM_BATCH = 20;    // trim in one go only after it passes 100 + 20 rows
+
 function logAction(adminName, action, details, reason, deviceInfo, opts) {
+  if (!AUDIT_ENABLED) return;
   try {
     // ── Parse opts (optional 6th arg) ──────────────────────────
     const _opts      = (opts && typeof opts === "object") ? opts : {};
@@ -670,19 +688,6 @@ function logAction(adminName, action, details, reason, deviceInfo, opts) {
       sheet.setColumnWidth(9,  80); // Severity
     }
 
-    // ── Migrate old 6-column sheet to 9-column on first new write ──
-    try {
-      const hdrRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-      if (hdrRow.length < 9) {
-        // Add missing columns to existing header
-        const newCols = ["Result","Error","Severity"].slice(-(9 - hdrRow.length));
-        newCols.forEach(function(col, i) {
-          sheet.getRange(1, hdrRow.length + 1 + i).setValue(col);
-        });
-        sheet.getRange(1, 1, 1, 9).setFontWeight("bold").setBackground("#334155").setFontColor("#ffffff");
-      }
-    } catch(migErr) { /* migration failure must not block the write */ }
-
     const ts = Utilities.formatDate(new Date(), "GMT+5:30", "dd-MMM-yyyy HH:mm:ss");
     const newRow = [
       ts,
@@ -696,25 +701,23 @@ function logAction(adminName, action, details, reason, deviceInfo, opts) {
       sanitize(severity,                  20),
     ];
 
-    const lastRow = sheet.appendRow(newRow).getLastRow
-      ? sheet.getLastRow()
-      : sheet.getLastRow();
-
-    // ── Row color for non-INFO entries ──────────────────────────
-    const rowColor = _severityColor[severity];
-    if (rowColor) {
+    // [PERF] ONE write call. Header migration, extra getLastRow calls and the
+    // per-row colour write were removed from the hot path (each is a separate
+    // slow Google call). Only ERROR / CRITICAL rows are still coloured.
+    sheet.appendRow(newRow);
+    if (severity === "ERROR" || severity === "CRITICAL") {
       try {
-        sheet.getRange(sheet.getLastRow(), 1, 1, 9).setBackground(rowColor);
-      } catch(colorErr) { /* color is cosmetic — never block */ }
+        sheet.getRange(sheet.getLastRow(), 1, 1, 9).setBackground(_severityColor[severity]);
+      } catch(colorErr) { /* cosmetic — never block */ }
     }
 
-    // ── Auto-trim: keep only latest 2000 rows (was 1000) ────────
+    // ── Auto-trim in BATCHES: keep the latest AUDIT_MAX_ROWS (100) rows, but only delete once the
+    // log passes AUDIT_MAX_ROWS + AUDIT_TRIM_BATCH. Deleting on EVERY write is a
+    // separate slow Google call each time; now it runs once per ~20 log entries.
     try {
-      const totalRows = sheet.getLastRow();
-      const MAX_ROWS  = 2000;
-      const dataRows  = totalRows - 1;
-      if (dataRows > MAX_ROWS) {
-        sheet.deleteRows(2, dataRows - MAX_ROWS);
+      const dataRows = sheet.getLastRow() - 1;
+      if (dataRows > AUDIT_MAX_ROWS + AUDIT_TRIM_BATCH) {
+        sheet.deleteRows(2, dataRows - AUDIT_MAX_ROWS);
       }
     } catch(trimErr) { /* trim failure must never crash the log write */ }
 
@@ -1355,7 +1358,13 @@ function _admFormatINR(n) {
 //  future fix (matching logic, cache-busting, etc.) only has to happen once.
 //  Returns true if a matching row was found and cleared, false otherwise.
 // ════════════════════════════════════════════════════════════════
-function _clearUserSessionRow(userId) {
+//
+//  [FIX] Now takes the caller's session token and only clears the row when it
+//  matches the token stored for that user. Before, ANY logout call that knew a
+//  UserId cleared that user's live session — so a stale tab, or a device that
+//  had just been kicked by a newer login, wiped the NEW session. A blank stored
+//  token has nothing to protect, so it is still treated as cleared.
+function _clearUserSessionRow(userId, token) {
   if (!userId) return false;
   try {
     const sheet    = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.USERS);
@@ -1373,6 +1382,14 @@ function _clearUserSessionRow(userId) {
         // [AUDIT-CANARY] Same observation-only Name-fallback log as _verifySession — see there for why.
         if ((!rowUserId || rowUserId !== userId) && rowName && rowName === userId) {
           logAction(userId, "SESSION_NAME_FALLBACK_MATCH", "Action: clearSession — matched by Name, not UserId (row UserId: " + rowUserId + ")", "", "", { severity:"WARN", result:"INFO" });
+        }
+        // [FIX] Token ownership check — only the holder of the CURRENT token may end it.
+        const _storedTok = tokenCol !== -1 ? String(allData[i][tokenCol] || "").trim() : "";
+        if (_storedTok !== "") {
+          const _callerTok = sanitize(token || "", 64);
+          if (!_callerTok || !_safeCompare(_storedTok, _hashSessionToken(_callerTok))) {
+            return false; // stale / foreign token — leave the live session alone
+          }
         }
         // Clear each column independently — do NOT nest expiryCol inside the
         // tokenCol check, so TokenExpiry still clears even if SessionToken's
@@ -2943,7 +2960,12 @@ function doGet(e) {
   const callback = /^[a-zA-Z0-9_$]{1,80}$/.test(_rawCb) ? _rawCb : "cb";
   let result = {};
 
-  _trackRequest(action);   // ── TRAFFIC COUNTER: fires before auth, counts every hit
+  // [FIX] Traffic counter = 1 read of ALL script properties + 1 write on EVERY request.
+  // The photo proxy (one call per avatar) and the 60s session poll are by far the most
+  // frequent calls, so they made every other request queue behind property-store
+  // traffic and burned the daily Properties quota. They are no longer counted;
+  // every other action still is.
+  if (action !== "getPhotoBase64" && action !== "checkSession") _trackRequest(action);   // ── TRAFFIC COUNTER
 
   // ── MUST #7: Verify session token for all write, mutating, and sensitive read actions
   // FIX SEC-1 (complete): Every action that modifies data OR exposes private data requires auth
@@ -2995,7 +3017,7 @@ function doGet(e) {
   ];
   if (_WRITE_ACTIONS.indexOf(action) !== -1 && !_verifySession(e.parameter, action)) {
     return ContentService
-      .createTextOutput(callback + "(" + JSON.stringify({status:"error",message:"Session expired. Please login again."}) + ")")
+      .createTextOutput(callback + "(" + JSON.stringify({status:"error",message:"Session expired. Please login again.",reason:_VS_LAST_REASON}) + ")")
       .setMimeType(ContentService.MimeType.JAVASCRIPT);
   }
 
@@ -3067,8 +3089,10 @@ function doGet(e) {
           let sessionSet = false;
           try {
             const sheet   = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.USERS);
-            const data    = sheet.getDataRange().getValues();
-            const headers = data[0];
+            // [PERF] Only the header row is read here. The full sheet is read below ONLY
+            // if the fast path cannot be used (fallback = original behaviour).
+            const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+            let data = null;
             let llCol = headers.indexOf("LastLogin");
             if (llCol === -1) { llCol = headers.length; sheet.getRange(1, llCol + 1).setValue("LastLogin"); }
             let tokenCol  = headers.indexOf("SessionToken");
@@ -3083,7 +3107,35 @@ function doGet(e) {
             const sessionTtlMs = _rememberMe ? 24 * 60 * 60 * 1000 : 30 * 60 * 1000;
             const expiryTime   = Date.now() + sessionTtlMs;
 
-            for (let i = 1; i < data.length; i++) {
+            // [PERF] Fast path: the row index comes from the USERS data already read at the
+            // top of login, and the 4 session cells are written with ONE setValues call
+            // when their columns sit side by side (else 4 setValue calls). No flush.
+            // Any doubt (row mismatch, missing column) falls through to the original loop.
+            let _fastDone = false;
+            try {
+              const _fi = users.findIndex(u => String(u.UserId) === String(safeUser.UserId));
+              const _row = _fi + 2;
+              // [SEC] Re-verify with ONE cell read that this row really belongs to this user
+              // (guards against rows inserted/deleted since the USERS data was read), so a
+              // session token can never be written to another member's row.
+              if (_fi !== -1 && _inlineToken && String(sheet.getRange(_row, (_uidCol !== -1 ? _uidCol : 0) + 1).getValue() || "") === String(safeUser.UserId)) {
+                const _cols = [llCol, tokenCol, expiryCol, ttlCol];
+                const _vals = [loginTime, _hashSessionToken(_inlineToken), expiryTime, sessionTtlMs];
+                const _min = Math.min.apply(null, _cols), _max = Math.max.apply(null, _cols);
+                if (_max - _min === 3) {
+                  const _ordered = [];
+                  _cols.forEach((c, k) => { _ordered[c - _min] = _vals[k]; });
+                  sheet.getRange(_row, _min + 1, 1, 4).setValues([_ordered]);
+                } else {
+                  _cols.forEach((c, k) => sheet.getRange(_row, c + 1).setValue(_vals[k]));
+                }
+                sessionSet = true;
+                _fastDone = true;
+              }
+            } catch(fastErr) { _fastDone = false; sessionSet = false; }
+
+            if (!_fastDone) data = sheet.getDataRange().getValues();
+            for (let i = 1; !_fastDone && i < data.length; i++) {
               const _rowId = _uidCol !== -1 ? String(data[i][_uidCol] || "") : String(data[i][0] || "");
               if (_rowId === String(safeUser.UserId)) {
                 sheet.getRange(i + 1, llCol + 1).setValue(loginTime);
@@ -3320,7 +3372,7 @@ function doGet(e) {
   else if (action === "clearSessionToken") {
     const userId = sanitize(e.parameter.userId, 30);
     if (userId) {
-      _clearUserSessionRow(userId);
+      _clearUserSessionRow(userId, e.parameter.sessionToken || e.parameter.token);
       logAction(userId, "SESSION_TOKEN_CLEARED", "UserId: " + userId, sanitize(e.parameter.reason||"Session cleared",200), sanitize(e.parameter.deviceInfo||"",200), { severity:"INFO", result:"SUCCESS" });
     }
     result = { status: "ok" };
@@ -3770,7 +3822,8 @@ function doGet(e) {
           // Use header-based column lookup — handles both old 6-col and new 9-col sheet layouts
           const hdr = data[0];
           const _ac = (n) => hdr.indexOf(n);
-          result = data.slice(1).slice(-1000).reverse().map(r => {
+          const _auLim = Math.min(Math.max(parseInt(e.parameter.limit, 10) || 1000, 1), 1000);
+          result = data.slice(1).slice(-_auLim).reverse().map(r => {
             const rawTs = r[0];
             // Sheets can auto-convert a date-like string into a real Date cell,
             // which then comes back as a JS Date object here (and would
@@ -3916,7 +3969,7 @@ function doGet(e) {
     // always actually ends the session server-side, regardless of which
     // action name the client calls.
     const logoutUserId = sanitize(e.parameter.userId, 30);
-    if (logoutUserId) _clearUserSessionRow(logoutUserId);
+    if (logoutUserId) _clearUserSessionRow(logoutUserId, e.parameter.sessionToken || e.parameter.token);
     logAction(
       sanitize(e.parameter.userName, 100) || "User",
       "Logout",
@@ -6399,7 +6452,7 @@ function doPost(e) {
     if (data.action === "clearSessionToken") {
       const userId = sanitize(data.userId || data.UserId || "", 30);
       if (userId) {
-        _clearUserSessionRow(userId);
+        _clearUserSessionRow(userId, data.sessionToken || data.token);
         logAction(userId, "SESSION_TOKEN_CLEARED", "UserId: " + userId, sanitize(data.reason||"Logout",200), "", { severity:"INFO", result:"SUCCESS" });
       }
       return ContentService.createTextOutput(JSON.stringify({ status: "ok" })).setMimeType(ContentService.MimeType.JSON);
@@ -6410,7 +6463,7 @@ function doPost(e) {
       // calls which the browser cancels the moment the page unloads. See
       // endSessionAndRedirect() in app.js, used by admin.js and user.js.
       const userId = sanitize(data.userId || data.UserId || "", 30);
-      if (userId) _clearUserSessionRow(userId);
+      if (userId) _clearUserSessionRow(userId, data.sessionToken || data.token);
       logAction(
         sanitize(data.userName, 100) || "User",
         "Logout",
@@ -6436,7 +6489,7 @@ function doPost(e) {
     }
     if (!_verifySession({ userId: _postUserId, sessionToken: _postToken }, data.action || "doPost")) {
       return ContentService
-        .createTextOutput(JSON.stringify({ status: "error", message: "Session expired. Please login again." }))
+        .createTextOutput(JSON.stringify({ status: "error", message: "Session expired. Please login again.", reason: _VS_LAST_REASON }))
         .setMimeType(ContentService.MimeType.JSON);
     }
 
@@ -7976,23 +8029,44 @@ function _buildBirthdayEmail(member) {
 
 var TC_DAILY_LIMIT = 20000; // ← CHANGE THIS if you have Google Workspace (use 100000)
 
+var TC_FLUSH_EVERY = 10;          // write counters to script properties every N requests...
+var TC_FLUSH_MS    = 5 * 60 * 1000; // ...or after 5 minutes, whichever comes first
+
+// [PERF] Counting a request used to cost one read of ALL script properties plus one
+// write on EVERY request. Now each request only touches CacheService (fast) and the
+// counters are written to script properties in one batch every TC_FLUSH_EVERY requests.
+// Stats are therefore up to ~10 requests / 5 min behind, and a rare simultaneous
+// request can drop a count — acceptable for traffic statistics only.
 function _trackRequest(action) {
+  try {
+    var cache = CacheService.getScriptCache();
+    var raw   = cache.get("TC_BUF");
+    var buf   = raw ? JSON.parse(raw) : { n: 0, a: {}, t: Date.now() };
+    buf.n = (buf.n || 0) + 1;
+    var k = action || "?";
+    buf.a[k] = (buf.a[k] || 0) + 1;
+    if (buf.n >= TC_FLUSH_EVERY || (Date.now() - (buf.t || Date.now())) > TC_FLUSH_MS) {
+      cache.remove("TC_BUF");
+      _flushTraffic(buf);
+    } else {
+      cache.put("TC_BUF", JSON.stringify(buf), 21600);
+    }
+  } catch(e) { /* never crash the main request */ }
+}
+
+function _flushTraffic(buf) {
   try {
     var props = PropertiesService.getScriptProperties();
     var now   = new Date();
     var ist   = new Date(now.getTime() + 5.5 * 60 * 60 * 1000);
-
     var dayKey  = "TC_DAY_"  + Utilities.formatDate(ist, "GMT+5:30", "yyyy-MM-dd");
     var hourKey = "TC_HOUR_" + Utilities.formatDate(ist, "GMT+5:30", "yyyy-MM-dd'T'HH");
-
-    // ── BATCHED: 1 read + 1 write = 2 PS calls/request (40,000/day at 20k requests)
-    //    Safely under the 50,000/day PropertiesService quota for free accounts.
-    //    Old code used 7 individual calls — would have failed after ~7,100 requests/day.
     var all = props.getProperties();
+    var add = Number(buf.n || 0);
 
-    var dayCount  = Number(all[dayKey]         || 0) + 1;
-    var hourCount = Number(all[hourKey]        || 0) + 1;
-    var total     = Number(all["TC_TOTAL"]     || 0) + 1;
+    var dayCount  = Number(all[dayKey]         || 0) + add;
+    var hourCount = Number(all[hourKey]        || 0) + add;
+    var total     = Number(all["TC_TOTAL"]     || 0) + add;
     var peakHour  = Number(all["TC_PEAK_HOUR"] || 0);
     var peakDay   = Number(all["TC_PEAK_DAY"]  || 0);
 
@@ -8003,15 +8077,29 @@ function _trackRequest(action) {
     if (hourCount > peakHour) updates["TC_PEAK_HOUR"] = String(hourCount);
     if (dayCount  > peakDay)  updates["TC_PEAK_DAY"]  = String(dayCount);
 
-    if (action) {
-      try {
-        var actMap = JSON.parse(all["TC_ACTIONS"] || "{}");
-        actMap[action] = (actMap[action] || 0) + 1;
-        updates["TC_ACTIONS"] = JSON.stringify(actMap);
-      } catch(e) {}
-    }
+    try {
+      var actMap = JSON.parse(all["TC_ACTIONS"] || "{}");
+      Object.keys(buf.a || {}).forEach(function(k) { actMap[k] = (actMap[k] || 0) + buf.a[k]; });
+      updates["TC_ACTIONS"] = JSON.stringify(actMap);
+    } catch(e) {}
 
-    props.setProperties(updates); // single write call
+    props.setProperties(updates);
+
+    // Housekeeping: stats only use the last 24 hours / 14 days, so old per-hour and
+    // per-day keys are dead weight that every later read has to load. Remove a few
+    // stale ones per flush (max 25) so the store stops growing.
+    try {
+      var hourCut = "TC_HOUR_" + Utilities.formatDate(new Date(ist.getTime() - 48 * 3600 * 1000), "GMT+5:30", "yyyy-MM-dd'T'HH");
+      var dayCut  = "TC_DAY_"  + Utilities.formatDate(new Date(ist.getTime() - 20 * 24 * 3600 * 1000), "GMT+5:30", "yyyy-MM-dd");
+      var removed = 0;
+      Object.keys(all).forEach(function(key) {
+        if (removed >= 25) return;
+        if ((key.indexOf("TC_HOUR_") === 0 && key < hourCut) || (key.indexOf("TC_DAY_") === 0 && key < dayCut)) {
+          props.deleteProperty(key);
+          removed++;
+        }
+      });
+    } catch(e) {}
   } catch(e) { /* never crash the main request */ }
 }
 

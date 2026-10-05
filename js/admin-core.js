@@ -698,20 +698,34 @@
       });
     };
 
+    // [FIX] Two changes to stop photo loading from flooding Apps Script:
+    //  1. In-flight de-duplication — the same member photo appears on many rows
+    //     (contributions, tracker, users…). Previously every <img> fired its OWN
+    //     request for the same file; now they all share one.
+    //  2. Max 3 photo requests at a time (mandirQueued in app.js). Previously every
+    //     avatar on screen was requested simultaneously, which saturated Apps
+    //     Script and made the dashboard's own data calls stall or fail.
+    window._adminPhotoInflight = {};
     async function _fetchAdminPhotoBase64(photoURL) {
       if (!photoURL) return null;
       if (window._adminPhotoB64Cache[photoURL]) return window._adminPhotoB64Cache[photoURL];
       const fileId = _adminExtractDriveFileId(photoURL);
       if (!fileId) return null;
-      try {
-        const _s = JSON.parse(localStorage.getItem("session") || "{}");
-        const res = await postData({ action: "getPhotoBase64", fileId: fileId, sessionToken: _s.sessionToken || "", userId: _s.userId || "" });
-        if (res && res.status === "success" && res.base64) {
-          window._adminPhotoB64Cache[photoURL] = res.base64;
-          return res.base64;
-        }
-      } catch (e) { /* fall through — keep initials/default avatar */ }
-      return null;
+      if (window._adminPhotoInflight[photoURL]) return window._adminPhotoInflight[photoURL];
+      const _job = mandirQueued(async function () {
+        try {
+          const _s = JSON.parse(localStorage.getItem("session") || "{}");
+          const res = await postData({ action: "getPhotoBase64", fileId: fileId, sessionToken: _s.sessionToken || "", userId: _s.userId || "" });
+          if (res && res.status === "success" && res.base64) {
+            window._adminPhotoB64Cache[photoURL] = res.base64;
+            return res.base64;
+          }
+        } catch (e) { /* fall through — keep initials/default avatar */ }
+        return null;
+      }).then(function (v) { delete window._adminPhotoInflight[photoURL]; return v; },
+              function (e) { delete window._adminPhotoInflight[photoURL]; return null; });
+      window._adminPhotoInflight[photoURL] = _job;
+      return _job;
     }
 
     function logout() {
@@ -818,7 +832,8 @@
     async function _loadAdminActivityNotifications() {
       const list = document.getElementById("adminNotifList");
       try {
-        const res = await getData("getAuditLog");
+        const res = await getData("getAuditLog&limit=100");   // [PERF] bell needs only the latest rows
+        window._adminNotifLastLoad = Date.now();
         const rows = Array.isArray(res) ? res : [];
         window._adminNotifStore = rows
           .filter(function (r) {
@@ -925,8 +940,21 @@
     // Load on startup, then refresh periodically so new activity (from this
     // admin or anyone else) shows up without needing a manual hook in every
     // add/update/delete function.
-    _loadAdminActivityNotifications();
-    setInterval(_loadAdminActivityNotifications, 45000);
+    // [PERF] This used to fire at page load AND every 45 s (one of the heaviest calls in
+    // the app). Now: first load is delayed so it does not compete with login / dashboard
+    // data, it refreshes every 5 minutes, and never while the tab is hidden. When the tab
+    // comes back into view it refreshes only if the data is older than 5 minutes.
+    var _ADM_NOTIF_MS = 5 * 60 * 1000;
+    setTimeout(_loadAdminActivityNotifications, 15000);
+    setInterval(function () {
+      if (document.hidden) return;
+      _loadAdminActivityNotifications();
+    }, _ADM_NOTIF_MS);
+    document.addEventListener("visibilitychange", function () {
+      if (!document.hidden && window._adminNotifLastLoad && (Date.now() - window._adminNotifLastLoad) > _ADM_NOTIF_MS) {
+        _loadAdminActivityNotifications();
+      }
+    });
 
     document.addEventListener("click", (e) => {
       if (!e.target.closest("#adminAvatar") && !e.target.closest("#adminDropdown")) {

@@ -905,29 +905,32 @@
         // while ad-hoc reads within the 60s window still benefit from dedup.
         if (!window._reqBadgeTimer) {
           window._reqBadgeTimer = setInterval(function() {
+            if (document.hidden) return;   // [PERF] no background calls while the tab is hidden
             mandirCacheBust("getContributionRequests");
             getCached("getContributionRequests").then(function(res) {
               window._allRequests = Array.isArray(res) ? res : [];
               _updateReqBadge();
             }).catch(function(){});
-          }, 2 * 60 * 1000);
+          }, 5 * 60 * 1000);   // [PERF] was every 2 minutes
         }
         // Populate email quota sidebar counter on page load.
         // FIX: Delay by 3s so the session token write from login has time to complete
         // before hitting getEmailQuota. Previously caused VERIFY_SESSION_ERROR in audit log.
         // _refreshEmailQuotaUI is the single owner of sb_email_quota —
         // updateSidebarSummary no longer reads quota to avoid async race.
+        // [PERF] Startup calls are now spread out (quota 5s, birthdays 9s, health 13s,
+        // bell 15s) instead of all firing together, so the server is never flooded.
         setTimeout(function() {
           if (typeof _refreshEmailQuotaUI === "function") _refreshEmailQuotaUI();
-        }, 3000);
+        }, 5000);
         // Auto-run health check once after data loads so the header
         // heartbeat dot shows the correct status colour from login
         if (!window._hcRanOnce && typeof runHealthCheck === "function") {
           window._hcRanOnce = true;
-          setTimeout(runHealthCheck, 1500);
+          setTimeout(runHealthCheck, 13000);
         }
         // Today's birthdays — lets admin send a wish too, same as members
-        _loadAdminBirthdayWidget();
+        setTimeout(function () { if (typeof _loadAdminBirthdayWidget === "function") _loadAdminBirthdayWidget(); }, 9000);
       } catch (err) {
         // Show specific error reason in the loading overlay with a Retry button
         _showLoadingError(err);

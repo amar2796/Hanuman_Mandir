@@ -146,15 +146,89 @@ async function sha256(str) {
   return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,"0")).join("");
 }
 
+/* ═══ SESSION-ERROR HANDLING (shared by getData / postData) ═══════════════
+   The server answers { status:"error", message:"Session expired..." | "Authentication
+   required." , reason } when the session token is blank / mismatched / expired.
+   Before, that object was handed straight back to callers, which treated it as
+   "no data" — so the dashboard just sat empty ("data not fetching") until the
+   user logged in again by hand.
+   Now: retry once (twice if the server reported a transient "error"), then end
+   the session cleanly via _forceLogout. Only acts on protected pages that really
+   have a local session, so public pages (index.html) are never redirected.
+   Returns true when it has taken over (caller must NOT resolve). ═══════════ */
+function _isSessionError(res) {
+  return !!(res && typeof res === "object" && res.status === "error" &&
+            typeof res.message === "string" &&
+            /^(session expired|authentication required)/i.test(res.message));
+}
+function _isProtectedPage() {
+  try { return /(^|\/)(admin|user|dashboard)(\.html)?$/i.test(window.location.pathname); } catch (e) { return false; }
+}
+function _onSessionError(res, attempt, retryFn) {
+  if (!_isSessionError(res) || !_isProtectedPage()) return false;
+  let s = null;
+  try { s = JSON.parse(localStorage.getItem("session") || "null"); } catch (e) {}
+  if (!s || !s.userId) return false;
+  const maxRetry = (res.reason === "error") ? 2 : 1;
+  if (attempt < maxRetry) { setTimeout(retryFn, attempt === 0 ? 1500 : 4000); return true; }
+  if (!window._sessionDeadHandled) {
+    window._sessionDeadHandled = true;
+    if (typeof _forceLogout === "function") {
+      _forceLogout("⚠️ Your session has ended. Please login again.", "Session expired - server rejected token");
+    } else {
+      try { localStorage.clear(); } catch (e) {}
+      location.replace("login.html");
+    }
+  }
+  return true; // page is leaving — never resolve
+}
+
+/* ═══ SMALL CONCURRENCY QUEUE (used for photo-proxy calls) ═══
+   Each photo goes through its own Apps Script execution. Opening a list with
+   dozens of avatars used to fire them ALL at once, saturating Apps Script
+   (simultaneous-execution cap) and making unrelated calls fail or stall. ═══ */
+window._mqActive = 0;
+window._mqWait = [];
+function mandirQueued(task, limit) {
+  limit = limit || 3;
+  return new Promise(function (resolve, reject) {
+    function run() {
+      window._mqActive++;
+      Promise.resolve().then(task).then(resolve, reject).then(function () {
+        window._mqActive--;
+        const next = window._mqWait.shift();
+        if (next) next();
+      });
+    }
+    if (window._mqActive < limit) run(); else window._mqWait.push(run);
+  });
+}
+
 /* ═══ JSONP GET ═══ */
-function getData(action) {
+function getData(action, _sAttempt, _nAttempt) {
   return new Promise((resolve,reject)=>{
     _cbId++; const cb="cb_"+_cbId+"_"+Date.now(); const script=document.createElement("script"); let done=false;
     window._activeJsonpCount = (window._activeJsonpCount||0) + 1;
     function _fin(){ if(!done){ done=true; window._activeJsonpCount = Math.max(0,(window._activeJsonpCount||1)-1); } }
-    window[cb]=function(data){ _fin(); clearTimeout(timer); delete window[cb]; script.remove(); resolve(data); };
+    window[cb]=function(data){
+      _fin(); clearTimeout(timer); delete window[cb]; script.remove();
+      // [FIX] Server said "session expired": retry briefly (could be a transient
+      // verify error / stale cache), then end the session cleanly instead of
+      // silently rendering an empty dashboard.
+      if (_onSessionError(data, _sAttempt || 0, function(){ getData(action, (_sAttempt || 0) + 1).then(resolve, reject); })) return;
+      resolve(data);
+    };
     const timer=setTimeout(()=>{ _fin(); window[cb]=function(){try{delete window[cb];script.remove();}catch(e){}}; try{script.remove();}catch(e){} reject(new Error("Request timed out.")); },45000); // 45s — aligned with other timeouts app-wide
-    script.onerror=function(){ _fin(); clearTimeout(timer); window[cb]=function(){try{delete window[cb];}catch(e){}}; try{script.remove();}catch(e){} reject(new Error("Network error. Check Apps Script deployment.")); };
+    script.onerror=function(){
+      _fin(); clearTimeout(timer); window[cb]=function(){try{delete window[cb];}catch(e){}}; try{script.remove();}catch(e){}
+      // [FIX] A network-level failure (Google front-end hiccup, stale connection, brief
+      // overload) is very often gone a moment later — the first request after a pause
+      // fails, the next one works. Reads are safe to repeat, so retry quietly up to
+      // twice (1.2s, 2.4s) before showing "Network error" to the user.
+      const _n = _nAttempt || 0;
+      if (_n < 2) { setTimeout(function(){ getData(action, _sAttempt, _n + 1).then(resolve, reject); }, 1200 * (_n + 1)); return; }
+      reject(new Error("Network error. Check Apps Script deployment."));
+    };
     let _url=API_URL+"?action="+action+"&callback="+cb;
     try{const _sess=JSON.parse(localStorage.getItem("session")||"{}");if(_sess.sessionToken)_url+="&sessionToken="+encodeURIComponent(_sess.sessionToken);if(_sess.userId)_url+="&userId="+encodeURIComponent(_sess.userId);}catch(_e){}
     script.src=_url; document.body.appendChild(script);
@@ -284,12 +358,18 @@ function endSessionAndRedirect(reason, options) {
 }
 window.endSessionAndRedirect = endSessionAndRedirect;
 
-function _postDataOnce(data, isRetry) {
+function _postDataOnce(data, isRetry, _sAttempt, _nAttempt) {
   return new Promise((resolve,reject)=>{
     _cbId++; const cb="cb_post_"+_cbId+"_"+Date.now(); const script=document.createElement("script"); let done=false;
     window._activeJsonpCount = (window._activeJsonpCount||0) + 1;
     function _fin(){ if(!done){ done=true; window._activeJsonpCount = Math.max(0,(window._activeJsonpCount||1)-1); } }
-    window[cb]=function(res){ _fin(); clearTimeout(timer); delete window[cb]; script.remove(); resolve(res); };
+    window[cb]=function(res){
+      _fin(); clearTimeout(timer); delete window[cb]; script.remove();
+      // [FIX] Same session-error handling as getData() — a rejected write never
+      // executed, so re-sending with the same IdempotencyKey is safe.
+      if (_onSessionError(res, _sAttempt || 0, function(){ _postDataOnce(data, isRetry, (_sAttempt || 0) + 1).then(resolve, reject); })) return;
+      resolve(res);
+    };
     const timer=setTimeout(()=>{
       _fin();
       window[cb]=function(){try{delete window[cb];script.remove();}catch(e){}};
@@ -308,7 +388,19 @@ function _postDataOnce(data, isRetry) {
       // the write for the first time, or hands back the original result.
       _postDataOnce(data, /*isRetry*/true).then(resolve).catch(reject);
     },45000); // 45s — aligned with other timeouts app-wide
-    script.onerror=function(){ _fin(); clearTimeout(timer); window[cb]=function(){try{delete window[cb];}catch(e){}}; try{script.remove();}catch(e){} reject(new Error("Network error.")); };
+    script.onerror=function(){
+      _fin(); clearTimeout(timer); window[cb]=function(){try{delete window[cb];}catch(e){}}; try{script.remove();}catch(e){}
+      // [FIX] Same quiet retry as getData(), but ONLY for actions that are safe to
+      // repeat: read actions (get*) and the two writes the server de-duplicates by
+      // IdempotencyKey. Other writes (emails, deletes…) are never auto-repeated.
+      const _n = _nAttempt || 0;
+      const _act = String(data && data.action || "");
+      if (_n < 2 && (/^get/i.test(_act) || _act === "addContribution" || _act === "addExpense")) {
+        setTimeout(function(){ _postDataOnce(data, isRetry, _sAttempt, _n + 1).then(resolve, reject); }, 1200 * (_n + 1));
+        return;
+      }
+      reject(new Error("Network error."));
+    };
     // ── AUTO-INJECT session token + userId so every write action is authenticated.
     // Only fills in missing fields — never overwrites values the caller already set.
     try {
@@ -679,19 +771,36 @@ window._myTabToken = (function() {
   }
 }());
 
-/* ── Same-browser tab kick (instant) ── */
+/* ── Same-browser tab sync ──
+   [FIX] This used to call _forceLogout() on EVERY SESSION_REVOKED message. But
+   that message is also sent by every page LOAD (user.js, admin-walkin.js) and by
+   login.js right after a successful login. All tabs of one browser share the same
+   localStorage session, so the "kicked" tab posted a logout with the NEW, valid
+   token and ran localStorage.clear() — destroying the session that had just been
+   created ("login success in audit log, but I'm not logged in"). It also fired
+   from the public index.html tab.
+   Now a tab only reacts when the session token in localStorage is DIFFERENT from
+   the one this page loaded with (i.e. a genuinely new login happened). Even then
+   it never logs out or clears anything — it just reloads to adopt the new session.
+   Messages from a sibling tab merely loading the same session are ignored. */
+window._myLoadedToken = (function(){
+  try { const s0 = JSON.parse(localStorage.getItem("session") || "null"); return (s0 && s0.sessionToken) || ""; } catch (e) { return ""; }
+})();
 (function(){
   if(typeof BroadcastChannel !== "undefined"){
     window._sessionBC = new BroadcastChannel("mandir_session");
     window._sessionBC.onmessage = function(e){
-      if(e.data && e.data.type === "SESSION_REVOKED"){
-        const s = JSON.parse(localStorage.getItem("session") || "null");
-        if(s && String(s.userId) === String(e.data.userId) &&
-           e.data.newTabToken !== window._myTabToken){
-          _forceLogout("⚠️ Logged in from another tab. This session has ended.",
-                       "Kicked - another tab opened");
-        }
-      }
+      if(!e.data || e.data.type !== "SESSION_REVOKED") return;
+      let s = null;
+      try { s = JSON.parse(localStorage.getItem("session") || "null"); } catch (_e) {}
+      if(!s || String(s.userId) !== String(e.data.userId)) return;
+      const stored = s.sessionToken || "";
+      if(!window._myLoadedToken){ window._myLoadedToken = stored; return; }
+      if(stored === window._myLoadedToken) return;   // same session — sibling tab just loaded
+      if(window._adoptingSession) return;
+      window._adoptingSession = true;
+      window._navFlag = true;
+      location.reload();                               // adopt the new session; no logout, no clear
     };
   }
 })();
@@ -738,9 +847,18 @@ function broadcastSessionRevoke(userId){
         if(done) return; done = true;
         try{ delete window[cb]; script.remove(); }catch(e){}
         // Only force logout on explicit { valid: false } — not on errors or missing fields
-        if(res && res.valid === false){
-          _forceLogout("⚠️ Your account was logged in from another device. This session has ended.",
-                       "Kicked - login from another device");
+        // [FIX] Previously ANY valid:false logged the user out — including the
+        // server's own transient "check_error" / "misconfigured" answers (e.g. when
+        // Apps Script is overloaded). Only definitive reasons end the session now,
+        // and the message matches the real reason.
+        if(res && res.valid === false && res.reason !== "check_error" && res.reason !== "misconfigured"){
+          if(res.reason === "token_mismatch"){
+            _forceLogout("⚠️ Your account was logged in from another device. This session has ended.",
+                         "Kicked - login from another device");
+          } else {
+            _forceLogout("⚠️ Your session has ended. Please login again.",
+                         "Session ended - " + (res.reason || "invalid"));
+          }
         }
         // res.valid === true → do nothing, session is valid
         // res is undefined/error → do nothing, skip this poll safely
@@ -838,10 +956,14 @@ function _forceLogout(message, logoutReason){
   // same file), which sends a real JSON body via sendBeacon — the version
   // user.js already uses correctly. This one shared fix covers both admin.html
   // and user.html, since they both load app.js.
-  window.addEventListener("beforeunload", function(){
-    if(window._navFlag) return; // in-app navigation, not a real close — skip
-    sendLogoutBeacon("Tab or browser closed");
-  });
+  // [FIX] REMOVED the beforeunload → sendLogoutBeacon("Tab or browser closed") call.
+  // beforeunload fires on EVERY page unload — a refresh, pull-to-refresh, the error
+  // screen's auto-retry (location.reload), a browser discarding the tab, closing a
+  // second tab — not only a real close. Each one cleared the server SessionToken
+  // while the browser kept its local copy, so the page still looked logged in but
+  // every request was rejected ("token blank") until the user logged in again.
+  // Sessions now end only by: the Logout button, the 30-min / 24h server expiry,
+  // the 30-min hidden-tab check, or a newer login replacing the token.
 })();
 
 

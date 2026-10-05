@@ -224,7 +224,20 @@ function _attemptLogin(mobile,hashedPwd,sessionToken,rememberMeChecked,n){
         reject(new Error("Request timed out."));
       }
     },45000); // 45s — aligned with other timeouts app-wide
-    s.onerror=function(){if(done)return;done=true;clearTimeout(timer);delete window[cbName];s.remove();reject(new Error("Network error."));};
+    s.onerror=function(){
+      if(done)return;done=true;clearTimeout(timer);delete window[cbName];s.remove();
+      // [FIX] A network-level failure on the first request (stale connection / Google
+      // front-end hiccup) used to show "Network error" and make the user click again
+      // — the second click then worked. Login is safe to repeat (same mobile, password
+      // hash and token just re-verify and re-write the same session), so retry up to 3
+      // attempts in total, quietly, before giving up.
+      if(n<3){
+        setMsg("loginMsg","⏳ Connecting… retrying ("+(n+1)+"/3)","success");
+        setTimeout(()=>{_attemptLogin(mobile,hashedPwd,sessionToken,rememberMeChecked,n+1).then(resolve).catch(reject);},n*1500);
+      }else{
+        reject(new Error("Network error."));
+      }
+    };
     s.src=API_URL+"?action=login&mobile="+encodeURIComponent(mobile)+"&password="+hashedPwd+
       "&token="+encodeURIComponent(sessionToken)+"&rememberMe="+(rememberMeChecked?"1":"0")+
       "&callback="+cbName;
