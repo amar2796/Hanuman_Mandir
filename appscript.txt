@@ -2960,6 +2960,14 @@ function doGet(e) {
   const callback = /^[a-zA-Z0-9_$]{1,80}$/.test(_rawCb) ? _rawCb : "cb";
   let result = {};
 
+// [WARM] Cheap "ping" - touches NO sheet, NO cache, NO property store, and is
+  // not counted by the traffic counter.
+  if (action === "ping") {
+    return ContentService
+      .createTextOutput(callback + "(" + JSON.stringify({ status: "ok", t: Date.now() }) + ")")
+      .setMimeType(ContentService.MimeType.JAVASCRIPT);
+  }
+
   // [FIX] Traffic counter = 1 read of ALL script properties + 1 write on EVERY request.
   // The photo proxy (one call per avatar) and the 60s session poll are by far the most
   // frequent calls, so they made every other request queue behind property-store
@@ -3086,8 +3094,20 @@ function doGet(e) {
           // breaks for anyone still running the old frontend.
           const _inlineToken = sanitize(e.parameter.token, 64);
           const _rememberMe  = sanitize(e.parameter.rememberMe, 5) === "1";
-          let sessionSet = false;
+          // [DUP-RETRY] If the browser did not receive the first answer (slow / dropped
+          // connection) it sends the SAME login again with the SAME one-time token. When the
+          // stored session hash already equals this token's hash and is still valid, the first
+          // call already did all the work: don't write or log the login a second time.
+          // (Proves possession of the token, so it cannot be used to hijack a session.)
+          let _dupRetry = false;
           try {
+            if (_inlineToken && String(userByMobile.SessionToken || "") === _hashSessionToken(_inlineToken) &&
+                Number(userByMobile.TokenExpiry || 0) > Date.now()) {
+              _dupRetry = true;
+            }
+          } catch(dupErr) { _dupRetry = false; }
+          let sessionSet = _dupRetry;
+          if (!_dupRetry) try {
             const sheet   = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.USERS);
             // [PERF] Only the header row is read here. The full sheet is read below ONLY
             // if the fast path cannot be used (fallback = original behaviour).
@@ -3155,7 +3175,7 @@ function doGet(e) {
             if (sessionSet) _bustSheetCache("c_users_verify");
           } catch(llErr) { /* non-fatal — never block login on this; sessionSet stays false, falls back below */ }
 
-          logAction(
+          if (!_dupRetry) logAction(
             safeUser.Name || "User",
             "Login",
             "Mobile: " + mobile + " | Role: " + (safeUser.Role || "User") + " | UserId: " + (safeUser.UserId || ""),
@@ -8199,4 +8219,25 @@ function cleanTrafficKeys() {
       }
     });
   } catch(e) {}
+}
+
+function keepWarm() {
+  try {
+    var h = Number(Utilities.formatDate(new Date(), "Asia/Kolkata", "H"));
+    if (h < 6 || h >= 23) return;                       // night: let it sleep
+    var url = ScriptApp.getService().getUrl();
+    if (!url) return;
+    UrlFetchApp.fetch(url + "?action=ping&callback=w", { muteHttpExceptions: true, followRedirects: true });
+  } catch (e) { /* a trigger must never throw */ }
+}
+ 
+function setupKeepWarmTrigger() {
+  removeKeepWarmTrigger();
+  ScriptApp.newTrigger("keepWarm").timeBased().everyMinutes(5).create();
+}
+ 
+function removeKeepWarmTrigger() {
+  ScriptApp.getProjectTriggers().forEach(function (t) {
+    if (t.getHandlerFunction() === "keepWarm") ScriptApp.deleteTrigger(t);
+  });
 }

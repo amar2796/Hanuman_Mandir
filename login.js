@@ -94,6 +94,21 @@ function getData(action){
     s.src=API_URL+"?action="+action+"&callback="+cb;document.body.appendChild(s);
   });
 }
+// [WARM] Fire one cheap "ping" the moment the login page opens. The Apps Script
+// backend may be asleep (cold start = several seconds on the first request);
+// by the time the user has typed their mobile + password it is already awake,
+// so the real login call is fast. Result is ignored; failures are harmless.
+function _prewarmBackend(){
+  try{
+    const cb="cb_warm_"+Date.now();const s=document.createElement("script");
+    const cleanup=function(){try{delete window[cb];}catch(e){}try{s.remove();}catch(e){}};
+    window[cb]=cleanup;s.onerror=cleanup;
+    s.src=API_URL+"?action=ping&callback="+cb;document.body.appendChild(s);
+    setTimeout(cleanup,45000);
+  }catch(e){}
+}
+setTimeout(_prewarmBackend,0);
+
 function postData(data){
   return new Promise((resolve,reject)=>{
     _cbId++;const cb="cb_post_"+_cbId+"_"+Date.now();
