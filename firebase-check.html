@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Firebase fast-login check</title>
+<style>
+  body{font-family:system-ui,Segoe UI,Arial,sans-serif;max-width:760px;margin:20px auto;padding:0 14px;color:#222;line-height:1.5}
+  h1{font-size:1.25rem;margin:0 0 6px} h2{font-size:1rem;margin:22px 0 6px}
+  input{padding:8px;font:inherit;border:1px solid #bbb;border-radius:4px;margin-right:6px}
+  button{padding:9px 16px;font:inherit;font-weight:600;background:#7a1f1f;color:#fff;border:0;border-radius:4px;cursor:pointer}
+  button:disabled{opacity:.5}
+  .row{padding:6px 8px;border-bottom:1px solid #eee} .ok{color:#166534} .bad{color:#b91c1c;font-weight:600} .hint{color:#555;font-size:.9rem;margin-left:22px}
+  .note{font-size:.85rem;color:#555}
+</style>
+</head>
+<body>
+<h1>Firebase fast-login check</h1>
+<p class="note">Open this page from the same folder as <b>config.js</b> (for example http://localhost:5500/firebase-check.html). Use a <b>member</b> account. Your password is not stored. Part 3 logs this member in on the server once, so afterwards log in again normally in the app.</p>
+
+<h2>Part 1 - Your files</h2><div id="p1"></div>
+
+<h2>Part 2 - Saved state in this browser</h2><div id="p2"></div>
+
+<h2>Part 3 - Live test</h2>
+<input id="mob" placeholder="Mobile number" inputmode="numeric"><input id="pw" type="password" placeholder="Password">
+<button id="go">Run check</button>
+<div id="p3"></div>
+
+<script src="config.js"></script>
+<script>
+const $=id=>document.getElementById(id);
+const add=(box,ok,text,hint)=>{const d=document.createElement("div");d.className="row";d.innerHTML='<span class="'+(ok?"ok":"bad")+'">'+(ok?"\u2714 ":"\u2716 ")+text+'</span>'+(hint?'<div class="hint">'+hint+'</div>':"");$(box).appendChild(d);};
+const imp=u=>import(u);
+const BASE="https://www.gstatic.com/firebasejs/10.12.2/";
+const ms=t=>Math.round(performance.now()-t)+" ms";
+const lim=(p,n,m)=>Promise.race([p,new Promise((_,r)=>setTimeout(()=>r(new Error(m)),n))]);
+
+async function fileCheck(){
+  const need=[["config.js",/FIREBASE_CONFIG\s*=\s*\{[^}]*apiKey/,"has your Firebase config","Paste your firebaseConfig object over the {} at the bottom of config.js."],
+              ["login.js",/_fbTryLogin/,"is the new version","Replace login.js with the new file."],
+              ["app.js",/_fbRegisterOnce/,"is the new version","Replace app.js with the new file."],
+              ["firebase-member.js",/mandirLoadAllData/,"exists and is the new file","Put firebase-member.js in the SAME folder as user.html."],
+              ["user.html",/firebase-member\.js/,"loads firebase-member.js","Replace user.html with the new file."],
+              ["user.js",/typeof mandirLoadAllData/,"is the new version","Replace user.js with the new file."]];
+  for(const [f,re,okText,hint] of need){
+    try{const r=await fetch(f+"?x="+Date.now(),{cache:"no-store"});const t=await r.text();
+      if(!r.ok)add("p1",false,f+" - not found ("+r.status+")",hint);
+      else if(!re.test(t))add("p1",false,f+" - found, but it is the OLD version or incomplete",hint);
+      else add("p1",true,f+" "+okText);
+    }catch(e){add("p1",false,f+" - could not be read",hint);}
+  }
+}
+function stateCheck(){
+  const off=Number(localStorage.getItem("fb_off")||0);
+  if(off>Date.now())add("p2",false,"Fast login is PAUSED until "+new Date(off).toLocaleTimeString(),'It was paused after an earlier problem. <a href="#" id="clr">Click here to switch it back on</a>.');
+  else add("p2",true,"Fast login is not paused");
+  const le=localStorage.getItem("fb_last_error");
+  if(le)add("p2",false,"Last saved problem: "+le.replace(/</g,"&lt;"),"This is the reason the last fast login was refused.");
+  else add("p2",true,"No saved login problem");
+  const c=$("clr");if(c)c.onclick=e=>{e.preventDefault();localStorage.removeItem("fb_off");localStorage.removeItem("fb_last_error");location.reload();};
+}
+function jsonp(url,n){return new Promise((res,rej)=>{const cb="chk_"+Date.now(),s=document.createElement("script");
+  const end=(v,e)=>{clearTimeout(t);try{delete window[cb];}catch(x){}s.remove();e?rej(e):res(v);};
+  const t=setTimeout(()=>end(null,new Error("no answer")),n);window[cb]=v=>end(v);s.onerror=()=>end(null,new Error("script blocked or failed"));
+  s.src=url+"&callback="+cb;document.body.appendChild(s);});}
+
+async function live(){
+  $("p3").innerHTML="";$("go").disabled=true;
+  try{
+    const digits=$("mob").value.replace(/\D/g,"");
+    if(!/^[6-9]\d{9}$/.test(digits)){add("p3",false,"Enter a valid 10-digit mobile number");return;}
+    if(typeof FIREBASE_CONFIG==="undefined"||!FIREBASE_CONFIG.apiKey){add("p3",false,"FIREBASE_CONFIG in config.js is empty","Fix Part 1 first.");return;}
+    let t=performance.now(),A,app,auth;
+    try{const m=await lim(Promise.all([imp(BASE+"firebase-app.js"),imp(BASE+"firebase-auth.js"),imp(BASE+"firebase-firestore.js")]),15000,"timeout");
+      A=m;app=m[0].initializeApp(FIREBASE_CONFIG);auth=m[1].getAuth(app);add("p3",true,"Firebase code loaded ("+ms(t)+")");}
+    catch(e){add("p3",false,"Firebase code did not load: "+e.message,"Check your internet connection or a blocker extension.");return;}
+    t=performance.now();let cred;
+    try{cred=await lim(A[1].signInWithEmailAndPassword(auth,digits+"@mandir.app",$("pw").value),15000,"sign-in took too long");
+      add("p3",true,"Firebase sign-in worked ("+ms(t)+")");}
+    catch(e){add("p3",false,"Firebase sign-in failed: "+(e.code||e.message),(e.code==="auth/invalid-credential"?"Wrong password, or this member is not in Firebase yet (or the password in Firebase is out of date).":"See the message above."));return;}
+    const tr=await cred.user.getIdTokenResult();const role=String(tr.claims.role||"").toLowerCase();
+    add("p3",role==="user","Role in Firebase: "+(role||"none")+" (uid "+cred.user.uid+")",role==="user"?"":"Only members use the fast login. Admins keep the normal login.");
+    t=performance.now();
+    try{const db=A[2].getFirestore(app),F=A[2];
+      const me=await F.getDoc(F.doc(db,"users",cred.user.uid));
+      const cs=await F.getDocs(F.query(F.collection(db,"contributions"),F.where("UserId","==",cred.user.uid)));
+      add("p3",me.exists(),"Firestore read "+(me.exists()?"worked":"found NO profile")+": "+cs.size+" contributions ("+ms(t)+")",me.exists()?"":"Run syncFirestoreNow in Apps Script.");}
+    catch(e){add("p3",false,"Firestore read failed: "+(e.code||e.message),(e.code==="permission-denied"?"The Firestore rules are not published. Publish the text from firestore-rules.txt.":""));}
+    t=performance.now();
+    const token=Array.from(crypto.getRandomValues(new Uint8Array(32))).map(b=>b.toString(16).padStart(2,"0")).join("");
+    try{const r=await jsonp(API_URL+"?action=firebaseSession&userId="+encodeURIComponent(cred.user.uid)+"&token="+token+"&rememberMe=false&idToken="+encodeURIComponent(tr.token),45000);
+      if(r&&r.status==="success")add("p3",true,"Server accepted the Firebase login ("+ms(t)+")");
+      else{const m=String(r&&r.message||"");let h="Message from server: "+m.replace(/</g,"&lt;");
+        if(!r||!r.errorCode)h="The server does not know the firebaseSession action. In Apps Script: check the two Ctrl+H replacements, then Deploy > Manage deployments > New version.";
+        else if(/API key|keyInvalid|API_KEY/i.test(m))h="FB_WEB_API_KEY in Apps Script is wrong or still the placeholder.";
+        else if(/idToken rejected/i.test(m))h="Google refused the token ("+m.replace(/</g,"&lt;")+"). Check FB_WEB_API_KEY in Apps Script.";
+        else if(r.errorCode==="inactive")h="This member is not Active in the sheet.";
+        add("p3",false,"Server refused: "+(r&&r.errorCode||"unknown action"),h);}
+    }catch(e){add("p3",false,"Server did not answer in 45 s ("+e.message+")","Apps Script was slow or the deployment URL in config.js is wrong. Try again once.");}
+    try{await A[1].signOut(auth);}catch(e){}
+  }finally{$("go").disabled=false;}
+}
+$("go").onclick=live;
+fileCheck().then(stateCheck);
+</script>
+</body>
+</html>
