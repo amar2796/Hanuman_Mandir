@@ -205,7 +205,58 @@ function mandirQueued(task, limit) {
 }
 
 /* ═══ JSONP GET ═══ */
-function getData(action, _sAttempt, _nAttempt) {
+// ── [FB] Fast Firebase login: register this browser's session token with the server ONCE, in the
+//    background, before the first Apps Script call. If it cannot be done, the member is sent back
+//    to the login page and the normal (Apps Script) login is used instead. ──
+window._fbPendingNow=false;
+function _fbFail(res){
+  try{localStorage.setItem("fb_last_error",JSON.stringify({at:new Date().toISOString(),result:res||"no answer (timeout)"}));console.warn("[firebase login] session registration failed:",res||"no answer (timeout)");}catch(e){}
+}
+function _fbRegisterOnce(s){
+  return new Promise(function(resolve){
+    var tries=0;
+    (function attempt(){
+      tries++;
+      var cb="cb_fb_"+Date.now()+"_"+tries, sc=document.createElement("script"), done=false;
+      var timer=setTimeout(function(){fin(null);},40000);
+      function fin(res){
+        if(done)return; done=true; clearTimeout(timer);
+        try{delete window[cb];}catch(e){} try{sc.remove();}catch(e){}
+        if(res&&res.status==="success")return resolve(true);
+        if(res&&res.status==="error"&&res.errorCode!=="server"){_fbFail(res);return resolve(false);} // a clear "no": do not retry
+        if(tries<3)return setTimeout(attempt,1500*tries);
+        _fbFail(res);resolve(false);
+      }
+      window[cb]=fin; sc.onerror=function(){fin(null);};
+      sc.src=API_URL+"?action=firebaseSession&userId="+encodeURIComponent(s.userId)+"&token="+encodeURIComponent(s.sessionToken)+"&rememberMe="+(s.fbRemember?"true":"false")+"&idToken="+encodeURIComponent(s.fbIdToken)+"&callback="+cb;
+      (document.body||document.head).appendChild(sc);
+    })();
+  });
+}
+window._fbReady=(function(){
+  try{
+    var s=JSON.parse(localStorage.getItem("session")||"null");
+    if(!s||!s.fbIdToken||!s.sessionToken)return Promise.resolve();
+    window._fbPendingNow=true;
+    return _fbRegisterOnce(s).then(function(ok){
+      window._fbPendingNow=false;
+      try{
+        var cur=JSON.parse(localStorage.getItem("session")||"null");
+        if(ok){
+          if(cur&&cur.sessionToken===s.sessionToken){delete cur.fbIdToken;delete cur.fbPending;delete cur.fbRemember;localStorage.setItem("session",JSON.stringify(cur));}
+        }else{
+          localStorage.setItem("fb_off",String(Date.now()+30*60*1000)); // use the normal login for the next 30 min
+          localStorage.removeItem("session");
+          location.replace("login.html");
+        }
+      }catch(e){}
+    });
+  }catch(e){return Promise.resolve();}
+})();
+function getData(action,_sAttempt,_nAttempt){return window._fbReady.then(function(){return _getDataRaw(action,_sAttempt,_nAttempt);});}
+function postData(data){return window._fbReady.then(function(){return _postDataRaw(data);});}
+
+function _getDataRaw(action, _sAttempt, _nAttempt) {
   return new Promise((resolve,reject)=>{
     _cbId++; const cb="cb_"+_cbId+"_"+Date.now(); const script=document.createElement("script"); let done=false;
     window._activeJsonpCount = (window._activeJsonpCount||0) + 1;
@@ -252,7 +303,7 @@ function getData(action, _sAttempt, _nAttempt) {
    Either way the client gets a real answer, and duplicates are impossible
    because the key — not a timing guess — is what the server checks.
    ═══════════════════════════════════════════════════════════════ */
-function postData(data) {
+function _postDataRaw(data) {
   // Generate the idempotency key ONCE per logical submit attempt.
   // Mutating `data` in place means callers that stash the same payload
   // object for a manual "Retry" button (admin.js: _contribFailedPayload,
@@ -345,6 +396,7 @@ function endSessionAndRedirect(reason, options) {
   options = options || {};
   window._navFlag = true; // beforeunload handlers check this to avoid double-firing
   sendLogoutBeacon(reason);
+  try { if (window.fbSignOut) window.fbSignOut(); } catch (e) {}
 
   if (options.clearAll) {
     try { localStorage.clear(); } catch (e) {}
@@ -557,6 +609,7 @@ function getCached(action) {
    Already called automatically by postData wrapping below.
    ═══════════════════════════════════════════════════════════ */
 function mandirCacheBust(action) {
+  try { if (!action || action === "getAllData") localStorage.setItem("fb_stale_until", String(Date.now() + 3*60*1000)); } catch (e) {} // data just changed: read the live sheet for 3 min
   if (action) {
     delete window._mandirCache[action];
     delete window._mandirPending[action];
@@ -831,6 +884,7 @@ function broadcastSessionRevoke(userId){
   const POLL_MS     = _isAdmin ? 60000 : 600000; // 60s for Admin, 10min for User
 
   function _poll(){
+    if(window._fbPendingNow) return; // still registering a fast-login session
     try {
       const s = JSON.parse(localStorage.getItem("session") || "null");
       // Skip poll entirely if session has no token (old session before redeployment,

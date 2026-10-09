@@ -1,4 +1,4 @@
-    var _hmMemberFilter = "all";
+var _hmMemberFilter = "all";
 
     /* ══════════════════════════════════════════════════
        VIEWING PERIOD BAR — fully interactive
@@ -867,7 +867,7 @@
       _resetLoadingOverlay();
       setLoading(true);
       try {
-        let allData = (await getCached("getAllData")) || {};
+        let allData = (await (typeof mandirLoadAllData === "function" ? mandirLoadAllData() : getCached("getAllData"))) || {};
         users = allData.users || [];
         types = allData.types || [];
         expenseTypes = allData.expenseTypes || [];

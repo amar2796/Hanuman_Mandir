@@ -915,7 +915,7 @@ const _U_NOTIF_DISMISSED = _U_PREFIX + "_notif_dismissed_ids"; // notification b
       } else {
         // Record not found locally — full re-fetch as fallback
         if (typeof mandirCacheBust === "function") mandirCacheBust("getAllData");
-        const fresh = (await getCached("getAllData")) || {};
+        const fresh = (await (typeof mandirLoadAllData === "function" ? mandirLoadAllData(true) : getCached("getAllData"))) || {};
         users            = fresh.users            || users;
         allContributions = fresh.contributions    || allContributions;
         allGoals         = fresh.goals            || allGoals;
@@ -1619,7 +1619,7 @@ existing updateUser action. No new Apps Script action needed.
     // _showUserLoadingOverlay() is called by caller (_doUserRetry / initial load), not here
     try {
       _uloStep(0); // Connecting to server…
-      let allData = (await getCached("getAllData")) || {};
+      let allData = (await (typeof mandirLoadAllData === "function" ? mandirLoadAllData() : getCached("getAllData"))) || {};
 
       // ── Guard: treat missing or structurally empty response as an error
       //    so the retry overlay is shown instead of a blank/zero dashboard.

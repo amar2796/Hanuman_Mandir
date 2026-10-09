@@ -7,9 +7,9 @@
   <!-- CSP: restricts framing and object embeds; script/style remain open for JSONP + CDN -->
   <meta http-equiv="Content-Security-Policy" content="frame-ancestors 'self'; object-src 'none'; base-uri 'self';">
   <!-- Favicon — fixes 404 on every page load -->
-  <link rel="icon" type="image/svg+xml" href="Image/logo.svg">
-  <link rel="icon" href="Image/logo.PNG" type="image/png" />
-  <link rel="apple-touch-icon" href="Image/logo.PNG">
+  <link rel="icon" type="image/webp" href="Image/logo.webp">
+  <link rel="icon" href="Image/logo.webp" type="image/webp" />
+  <link rel="apple-touch-icon" href="Image/logo.webp">
   <!-- DNS prefetch + preconnect declared once each (was duplicated) -->
   <link rel="dns-prefetch" href="https://cdnjs.cloudflare.com" />
   <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin />
@@ -169,12 +169,12 @@
       </div>
       <div class="hdr-avatar-wrap">
         <img id="hdr_photo" class="hdr-avatar" src="Image/logo.webp" loading="eager" decoding="async"
-          onerror="this.onerror=null;this.src='Image/logo.PNG';"
+          onerror="this.onerror=null;this.src='Image/logo.webp';"
           onclick="toggleUserDropdown()" title="Account" alt="User avatar" role="button" aria-haspopup="true" aria-expanded="false" aria-controls="userDropdown" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleUserDropdown();}" />
         <div id="userDropdown" class="hdr-dropdown" role="menu" aria-label="Account menu">
           <div class="hdr-drop-head">
             <img id="hdr_drop_photo" src="data:," loading="lazy" decoding="async"
-              onerror="this.onerror=null;this.src='Image/logo.PNG';"
+              onerror="this.onerror=null;this.src='Image/logo.webp';"
               alt="" />
             <div>
               <div class="hdr-drop-head-name" id="hdr_drop_name">—</div>
@@ -905,7 +905,8 @@
   </button>
 
   <script src="config.js"></script>
-  <script src="app.js"></script>
+  <script src="firebase-member.js"></script>
+<script src="app.js"></script>
   <script src="user.js"></script>
   <script src="mandir-features.js"></script>
 </body>
