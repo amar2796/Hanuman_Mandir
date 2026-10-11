@@ -711,6 +711,7 @@
       if (window._adminPhotoB64Cache[photoURL]) return window._adminPhotoB64Cache[photoURL];
       const fileId = _adminExtractDriveFileId(photoURL);
       if (!fileId) return null;
+      try { var _st = window.mandirPhotoStore && window.mandirPhotoStore.get(fileId); if (_st) { window._adminPhotoB64Cache[photoURL] = _st; return _st; } } catch (e) {}
       if (window._adminPhotoInflight[photoURL]) return window._adminPhotoInflight[photoURL];
       const _job = mandirQueued(async function () {
         try {
@@ -718,6 +719,7 @@
           const res = await postData({ action: "getPhotoBase64", fileId: fileId, sessionToken: _s.sessionToken || "", userId: _s.userId || "" });
           if (res && res.status === "success" && res.base64) {
             window._adminPhotoB64Cache[photoURL] = res.base64;
+            try { if (window.mandirPhotoStore) window.mandirPhotoStore.set(fileId, res.base64); } catch (e) {}
             return res.base64;
           }
         } catch (e) { /* fall through — keep initials/default avatar */ }

@@ -253,8 +253,32 @@ window._fbReady=(function(){
     });
   }catch(e){return Promise.resolve();}
 })();
-function getData(action,_sAttempt,_nAttempt){return window._fbReady.then(function(){return _getDataRaw(action,_sAttempt,_nAttempt);});}
-function postData(data){return window._fbReady.then(function(){return _postDataRaw(data);});}
+// Reads: if firebase-member.js can answer this action from Firestore (no Apps Script, no waiting for the
+// session registration) it does; if it returns nothing or fails, the normal Apps Script call runs.
+function getData(action,_sAttempt,_nAttempt){
+  var h=null;
+  try{if(!_sAttempt&&!_nAttempt&&window.mandirFirebaseFetch)h=window.mandirFirebaseFetch(action);}catch(e){h=null;}
+  var slow=function(){return window._fbReady.then(function(){return _getDataRaw(action,_sAttempt,_nAttempt);});};
+  if(h)return h.then(function(r){return(r===undefined||r===null)?slow():r;},slow);
+  return slow();
+}
+// Writes: remember "data just changed" so reads use the live sheet for 3 minutes (Firestore catches up within ~1-2 min).
+var _FB_WRITE_RE=/^(add|update|delete|approve|reject|restore|reset|change|resolve|register|verify|submit|edit|save|remove|upload|clear|toggle|send)/i;
+function postData(data){
+  try{if(data&&_FB_WRITE_RE.test(String(data.action||"")))localStorage.setItem("fb_stale_until",String(Date.now()+3*60*1000));}catch(e){}
+  return window._fbReady.then(function(){return _postDataRaw(data);});
+}
+// Photos: keep each avatar on this device for 7 days so it is fetched through Apps Script only once.
+window.mandirPhotoStore={
+  get:function(id){try{var r=localStorage.getItem("mph_"+id);if(!r)return null;var o=JSON.parse(r);if(!o||Date.now()-o.t>7*864e5){localStorage.removeItem("mph_"+id);return null;}return o.v;}catch(e){return null;}},
+  set:function(id,v){
+    if(!id||!v||v.length>180000)return;
+    var rec=JSON.stringify({t:Date.now(),v:v});
+    try{localStorage.setItem("mph_"+id,rec);}catch(e){try{this._evict();localStorage.setItem("mph_"+id,rec);}catch(e2){}}
+  },
+  _evict:function(){var a=[],i,k;for(i=0;i<localStorage.length;i++){k=localStorage.key(i);if(k&&k.indexOf("mph_")===0){try{a.push([k,JSON.parse(localStorage.getItem(k)).t||0]);}catch(e){a.push([k,0]);}}}
+    a.sort(function(x,y){return x[1]-y[1];});for(i=0;i<Math.min(6,a.length);i++)localStorage.removeItem(a[i][0]);}
+};
 
 function _getDataRaw(action, _sAttempt, _nAttempt) {
   return new Promise((resolve,reject)=>{

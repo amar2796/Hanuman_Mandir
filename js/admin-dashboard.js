@@ -927,7 +927,8 @@ var _hmMemberFilter = "all";
         // heartbeat dot shows the correct status colour from login
         if (!window._hcRanOnce && typeof runHealthCheck === "function") {
           window._hcRanOnce = true;
-          setTimeout(runHealthCheck, 13000);
+          var _hcLast = 0; try { _hcLast = Number(localStorage.getItem("hc_last") || 0); } catch (e) {}
+          if (Date.now() - _hcLast > 30 * 60 * 1000) setTimeout(function () { try { localStorage.setItem("hc_last", String(Date.now())); } catch (e) {} runHealthCheck(); }, 13000); // at most once per 30 min
         }
         // Today's birthdays — lets admin send a wish too, same as members
         setTimeout(function () { if (typeof _loadAdminBirthdayWidget === "function") _loadAdminBirthdayWidget(); }, 9000);

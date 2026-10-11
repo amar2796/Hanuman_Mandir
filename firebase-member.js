@@ -62,6 +62,13 @@
   window.fbLoadAdminData = async function (userId, force) {
     userId = String(userId);
     if (!force && _acache && _acache.uid === userId && Date.now() - _acacheAt < 300000) return _acache.data;
+    // Reload / second tab within 2 minutes: reuse the copy kept for this browser session (saves ~600 Firestore reads)
+    if (!force) {
+      try {
+        var sc = JSON.parse(sessionStorage.getItem("fb_admin_cache") || "null");
+        if (sc && sc.uid === userId && Date.now() - sc.at < 120000 && sc.data && sc.data.users) { _acache = { uid: userId, data: sc.data }; _acacheAt = sc.at; return sc.data; }
+      } catch (e) {}
+    }
     var t0 = Date.now();
     var s = await sdk(), u = await who(s, 7000);
     if (!u || u.uid !== userId) throw new Error("not signed in to Firebase");
@@ -83,8 +90,45 @@
       yearConfig: list(r[7]).sort(function (x, y) { return Number(x.Year) - Number(y.Year); })
     };
     _acache = { uid: userId, data: data }; _acacheAt = Date.now();
+    try { sessionStorage.setItem("fb_admin_cache", JSON.stringify({ uid: userId, at: _acacheAt, data: data })); } catch (e) {}   // too big / blocked: just skip
     try { console.info("[firebase] admin data loaded from Firestore in " + (Date.now() - t0) + " ms (" + (users.length + data.contributions.length + data.expenses.length) + " main records)"); } catch (e) {}
     return data;
+  };
+
+
+  // ── Contribution requests straight from Firestore (small table) ──
+  // Admin: pending requests only. Member: only their own. Called through getData() in app.js.
+  var _rq = {};
+  function fbLoadRequests(kind, userId) {
+    var key = kind + "|" + userId, hit = _rq[key];
+    if (hit && Date.now() - hit.at < 60000) return Promise.resolve(hit.data);
+    return sdk().then(function (s) {
+      return who(s, 7000).then(function (u) {
+        if (!u || u.uid !== String(userId)) throw new Error("not signed in to Firebase");
+        var F = s.F, col = F.collection(s.db, "contributionRequests");
+        var q = kind === "getContributionRequests"
+          ? F.query(col, F.where("Status", "==", "Pending"))
+          : F.query(col, F.where("UserId", "==", String(userId)));
+        return F.getDocs(q).then(function (snap) {
+          var data = snap.docs.map(function (d) { return d.data(); }).sort(function (x, y) { return byNum(y.ReqId, x.ReqId); });  // newest first, like the old reply
+          _rq[key] = { at: Date.now(), data: data };
+          return data;
+        });
+      });
+    });
+  }
+  // Returns a Promise of the answer, or null when this action is not handled here (-> normal Apps Script call).
+  window.mandirFirebaseFetch = function (action) {
+    var a = String(action || "").split("&")[0];
+    if (a !== "getContributionRequests" && a !== "getUserContributionRequests") return null;
+    try {
+      var s = JSON.parse(localStorage.getItem("session") || "null");
+      if (!s || !s.userId) return null;
+      if (Number(localStorage.getItem("fb_stale_until") || 0) > Date.now()) return null;       // just changed something: live sheet
+      var role = String(s.role || "").toLowerCase();
+      if (a === "getContributionRequests" && role !== "admin") return null;
+      return fbLoadRequests(a, s.userId);
+    } catch (e) { return null; }
   };
 
   // Used by user.js instead of getCached("getAllData")
