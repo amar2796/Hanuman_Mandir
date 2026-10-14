@@ -117,17 +117,90 @@
       });
     });
   }
+  // ── small shared lists: broadcasts, today's birthdays, birthday wishes ──
+  var _fc = {};
+  function cached(key, ssMs, fn) {                    // 60 s in memory, optional copy for this browser session
+    var hit = _fc[key];
+    if (hit && Date.now() - hit.at < 60000) return Promise.resolve(hit.data);
+    if (ssMs) { try { var r = JSON.parse(sessionStorage.getItem("fbc_" + key) || "null"); if (r && Date.now() - r.at < ssMs) { _fc[key] = r; return Promise.resolve(r.data); } } catch (e) {} }
+    return fn().then(function (data) {
+      var rec = { at: Date.now(), data: data }; _fc[key] = rec;
+      if (ssMs) { try { sessionStorage.setItem("fbc_" + key, JSON.stringify(rec)); } catch (e) {} }
+      return data;
+    });
+  }
+  function signedInAs(userId) { return sdk().then(function (s) { return who(s, 7000).then(function (u) { if (!u || u.uid !== String(userId)) throw new Error("not signed in to Firebase"); return s; }); }); }
+  function istNow() { var d = new Date(Date.now() + 19800000), p = function (n) { return ("0" + n).slice(-2); }; return { year: d.getUTCFullYear(), key: d.getUTCFullYear() + "-" + p(d.getUTCMonth() + 1) + "-" + p(d.getUTCDate()) }; }
+
+  function fbBroadcasts(userId, admin) {
+    return cached("bc|" + (admin ? "a" : "m"), 120000, function () {
+      return signedInAs(userId).then(function (s) {
+        var F = s.F;
+        return F.getDocs(F.query(F.collection(s.db, "broadcasts"), F.orderBy("BcId", "desc"), F.limit(20))).then(function (snap) {
+          var rows = snap.docs.map(function (d) { var x = d.data(); return { BcId: x.BcId || "", Type: x.Type || "", Priority: x.Priority || "normal", Title: x.Title || "", Message: x.Message || "", Time: x.Time || "", AdminName: x.AdminName || "", Status: x.Status || "Enabled" }; });
+          return admin ? rows : rows.filter(function (b) { return String(b.Status || "Enabled").toLowerCase() !== "disabled"; });   // same order of steps as the old reply
+        });
+      });
+    });
+  }
+
+  function fbBirthdays(userId) {
+    var n = istNow();
+    return cached("bd|" + userId + "|" + n.key, 120000, function () {
+      return signedInAs(userId).then(function (s) {
+        var F = s.F;
+        return Promise.all([
+          F.getDoc(F.doc(s.db, "meta", "birthdays")),
+          F.getDocs(F.query(F.collection(s.db, "wishes"), F.where("FromUserId", "==", String(userId))))
+        ]).then(function (r) {
+          if (!r[0].exists()) throw new Error("no birthday list yet");
+          var b = r[0].data();
+          if (b.date !== n.key) throw new Error("birthday list not refreshed for today yet");      // -> normal Apps Script call
+          var wished = {};
+          r[1].docs.forEach(function (d) { var w = d.data(); if (String(w.Year) === String(n.year)) wished[String(w.ToUserId)] = true; });
+          var mine = false, others = [];
+          (b.people || []).forEach(function (x) {
+            if (String(x.UserId) === String(userId)) mine = true;
+            else others.push({ UserId: x.UserId, Name: x.Name, PhotoURL: x.PhotoURL || "", alreadyWished: !!wished[String(x.UserId)] });
+          });
+          return { status: "success", isMyBirthdayToday: mine, others: others };
+        });
+      });
+    });
+  }
+
+  function fbMyWishes(userId) {
+    var n = istNow();
+    return cached("mw|" + userId + "|" + n.key, 0, function () {
+      return signedInAs(userId).then(function (s) {
+        var F = s.F;
+        return F.getDocs(F.query(F.collection(s.db, "wishes"), F.where("ToUserId", "==", String(userId)))).then(function (snap) {
+          var wishes = snap.docs.map(function (d) { return d.data(); })
+            .filter(function (w) { return String(w.Year) === String(n.year); })
+            .sort(function (a, b) { return byNum(b.WishId, a.WishId); })                        // newest first
+            .map(function (w) { return { WishId: w.WishId, FromName: w.FromName, Message: w.Message, Timestamp: w.Timestamp }; });
+          return { status: "success", wishes: wishes, count: wishes.length };
+        });
+      });
+    });
+  }
+
   // Returns a Promise of the answer, or null when this action is not handled here (-> normal Apps Script call).
+  var _FB_READS = { getContributionRequests: 1, getUserContributionRequests: 1, getBroadcasts: 1, getBroadcastsAdmin: 1, getTodayBirthdays: 1, getMyBirthdayWishes: 1 };
   window.mandirFirebaseFetch = function (action) {
     var a = String(action || "").split("&")[0];
-    if (a !== "getContributionRequests" && a !== "getUserContributionRequests") return null;
+    if (!_FB_READS[a]) return null;
     try {
       var s = JSON.parse(localStorage.getItem("session") || "null");
       if (!s || !s.userId) return null;
       if (Number(localStorage.getItem("fb_stale_until") || 0) > Date.now()) return null;       // just changed something: live sheet
       var role = String(s.role || "").toLowerCase();
-      if (a === "getContributionRequests" && role !== "admin") return null;
-      return fbLoadRequests(a, s.userId);
+      if ((a === "getContributionRequests" || a === "getBroadcastsAdmin") && role !== "admin") return null;
+      if (a === "getContributionRequests" || a === "getUserContributionRequests") return fbLoadRequests(a, s.userId);
+      if (a === "getBroadcasts") return fbBroadcasts(s.userId, false);
+      if (a === "getBroadcastsAdmin") return fbBroadcasts(s.userId, true);
+      if (a === "getTodayBirthdays") return fbBirthdays(s.userId);
+      return fbMyWishes(s.userId);
     } catch (e) { return null; }
   };
 
