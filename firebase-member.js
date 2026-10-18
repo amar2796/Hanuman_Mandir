@@ -26,6 +26,21 @@
     });
   }
 
+  // ── tiny profile photos kept in Firestore (never allowed to break the main data load) ──
+  window._fbThumbs = window._fbThumbs || {};
+  window.mandirThumb = function (fileId) { return (window._fbThumbs && window._fbThumbs[fileId]) || null; };
+  function loadThumbs(s, userId, admin) {
+    var F = s.F;
+    var p = admin
+      ? F.getDocs(F.collection(s.db, "photoThumbs")).then(function (q) { return q.docs.map(function (d) { return d.data(); }); })
+      : F.getDoc(F.doc(s.db, "photoThumbs", String(userId))).then(function (d) { return d.exists() ? [d.data()] : []; });
+    return p.then(function (list) {
+      var m = {};
+      list.forEach(function (x) { if (x && x.FileId && x.Thumb) { window._fbThumbs[x.FileId] = x.Thumb; m[x.FileId] = x.Thumb; } });
+      return m;
+    }, function () { return {}; });
+  }
+
   var byNum = function (a, b) { return String(a).localeCompare(String(b), undefined, { numeric: true }); };
   var bySort = function (k) { return function (x, y) { return (Number(x.SortOrder) || 0) - (Number(y.SortOrder) || 0) || byNum(x[k], y[k]); }; };
 
@@ -35,6 +50,7 @@
     var t0 = Date.now();
     var s = await sdk(), u = await who(s, 7000);
     if (!u || u.uid !== userId) throw new Error("not signed in to Firebase");
+    var thP = loadThumbs(s, userId, false);
     var F = s.F, db = s.db, col = function (c) { return F.collection(db, c); };
     var r = await Promise.all([
       F.getDoc(F.doc(db, "users", userId)),
@@ -43,6 +59,7 @@
     ]);
     var list = function (q) { return q.docs.map(function (d) { return d.data(); }); };
     if (!r[0].exists()) throw new Error("profile not found in Firestore");
+    await thP;
     var data = {
       users: [r[0].data()],
       types: list(r[2]).sort(bySort("TypeId")),
@@ -66,14 +83,16 @@
     if (!force) {
       try {
         var sc = JSON.parse(sessionStorage.getItem("fb_admin_cache") || "null");
-        if (sc && sc.uid === userId && Date.now() - sc.at < 120000 && sc.data && sc.data.users) { _acache = { uid: userId, data: sc.data }; _acacheAt = sc.at; return sc.data; }
+        if (sc && sc.uid === userId && Date.now() - sc.at < 120000 && sc.data && sc.data.users) { try { var tm = sc.thumbs || {}; for (var k in tm) window._fbThumbs[k] = tm[k]; } catch (e2) {} _acache = { uid: userId, data: sc.data }; _acacheAt = sc.at; return sc.data; }
       } catch (e) {}
     }
     var t0 = Date.now();
     var s = await sdk(), u = await who(s, 7000);
     if (!u || u.uid !== userId) throw new Error("not signed in to Firebase");
+    var thP = loadThumbs(s, userId, true);
     var F = s.F, db = s.db, all = function (c) { return F.getDocs(F.collection(db, c)); };
     var r = await Promise.all([all("users"), all("contributions"), all("types"), all("occasions"), all("expenses"), all("expenseTypes"), all("goals"), all("yearConfig")]);
+    var thumbs = await thP;
     var list = function (q) { return q.docs.map(function (d) { return d.data(); }); };
     var users = list(r[0]).sort(function (x, y) { return byNum(x.UserId, y.UserId); });
     if (!users.some(function (x) { return String(x.UserId) === userId; })) throw new Error("admin profile not found in Firestore");
@@ -90,7 +109,7 @@
       yearConfig: list(r[7]).sort(function (x, y) { return Number(x.Year) - Number(y.Year); })
     };
     _acache = { uid: userId, data: data }; _acacheAt = Date.now();
-    try { sessionStorage.setItem("fb_admin_cache", JSON.stringify({ uid: userId, at: _acacheAt, data: data })); } catch (e) {}   // too big / blocked: just skip
+    try { sessionStorage.setItem("fb_admin_cache", JSON.stringify({ uid: userId, at: _acacheAt, data: data, thumbs: thumbs })); } catch (e) {}   // too big / blocked: just skip
     try { console.info("[firebase] admin data loaded from Firestore in " + (Date.now() - t0) + " ms (" + (users.length + data.contributions.length + data.expenses.length) + " main records)"); } catch (e) {}
     return data;
   };

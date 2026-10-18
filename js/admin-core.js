@@ -711,6 +711,7 @@
       if (window._adminPhotoB64Cache[photoURL]) return window._adminPhotoB64Cache[photoURL];
       const fileId = _adminExtractDriveFileId(photoURL);
       if (!fileId) return null;
+      try { var _th = window.mandirThumb && window.mandirThumb(fileId); if (_th) return _th; } catch (e) {}
       try { var _st = window.mandirPhotoStore && window.mandirPhotoStore.get(fileId); if (_st) { window._adminPhotoB64Cache[photoURL] = _st; return _st; } } catch (e) {}
       if (window._adminPhotoInflight[photoURL]) return window._adminPhotoInflight[photoURL];
       const _job = mandirQueued(async function () {

@@ -237,11 +237,12 @@ const _U_NOTIF_DISMISSED = _U_PREFIX + "_notif_dismissed_ids"; // notification b
   // [FIX] In-flight de-duplication + max 3 concurrent photo requests (mandirQueued,
   // app.js) — same reasoning as _fetchAdminPhotoBase64 in js/admin-core.js.
   window._photoInflight = {};
-  async function _fetchPhotoBase64(photoURL) {
+  async function _fetchPhotoBase64(photoURL, full) {
     if (!photoURL) return null;
     if (window._photoB64Cache[photoURL]) return window._photoB64Cache[photoURL];
     const fileId = _extractDriveFileId(photoURL);
     if (!fileId) return null;
+    if (!full) { try { var _th = window.mandirThumb && window.mandirThumb(fileId); if (_th) return _th; } catch (e) {} }
     try { var _st = window.mandirPhotoStore && window.mandirPhotoStore.get(fileId); if (_st) { window._photoB64Cache[photoURL] = _st; return _st; } } catch (e) {}
     if (window._photoInflight[photoURL]) return window._photoInflight[photoURL];
     const _job = mandirQueued(async function () {
@@ -3005,7 +3006,7 @@ Uses jsPDF already loaded. No server call needed.
       let PHOTO = null;
       if (myProfile.PhotoURL) {
         try {
-          PHOTO = await _fetchPhotoBase64(myProfile.PhotoURL);
+          PHOTO = await _fetchPhotoBase64(myProfile.PhotoURL, true);
         } catch (e) { PHOTO = null; }
       }
 
