@@ -224,3 +224,18 @@ tr.row-rejected td {
   gap: 10px;
   align-items: center;
 }
+/* ── Users page: Role filter row (Admin / User) + Inactive status tab ── */
+.status-tab.tab-inactive.active { background: #64748b; border-color: #64748b; }
+.ur-bar { display:flex; align-items:center; gap:8px; margin:0 0 12px; flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none; -webkit-overflow-scrolling:touch; }
+.ur-bar::-webkit-scrollbar { display:none; }
+.ur-lbl { font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:#94a3b8; flex-shrink:0; }
+.ur-btn { flex-shrink:0; display:inline-flex; align-items:center; gap:6px; padding:7px 14px; border-radius:999px; border:1.5px solid #e2e8f0; background:#fff; color:#475569; font-size:12.5px; font-weight:600; cursor:pointer; box-shadow:none; transform:none; }
+.ur-btn:hover { border-color:#334155; color:#334155; }
+.ur-btn.active { background:#334155; border-color:#334155; color:#fff; }
+.ur-ct { background:#e2e8f0; color:#475569; border-radius:10px; padding:1px 8px; font-size:11px; font-weight:700; }
+.ur-btn.active .ur-ct { background:rgba(255,255,255,.25); color:#fff; }
+body.dark-mode .ur-btn { background:#111827; border-color:#2d3f58; color:#94a3b8; }
+body.dark-mode .ur-btn:hover { border-color:#C1440E; color:#C1440E; }
+body.dark-mode .ur-btn.active { background:#C1440E; border-color:#C1440E; color:#fff; }
+body.dark-mode .ur-ct { background:#1e2d45; color:#94a3b8; }
+body.dark-mode .ur-btn.active .ur-ct { background:rgba(255,255,255,.25); color:#fff; }

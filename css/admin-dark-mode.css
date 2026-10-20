@@ -221,6 +221,7 @@ body.dark-mode .status-tab.active { background: #C1440E !important; border-color
 body.dark-mode .status-tab.tab-pending.active  { background: #e67e22 !important; border-color: #e67e22 !important; }
 body.dark-mode .status-tab.tab-rejected.active { background: #e74c3c !important; border-color: #e74c3c !important; }
 body.dark-mode .status-tab.tab-approved.active { background: #27ae60 !important; border-color: #27ae60 !important; }
+body.dark-mode .status-tab.tab-inactive.active { background: #64748b !important; border-color: #64748b !important; }
 body.dark-mode .status-tab:not(.active) .tab-ct { background: #1e2d45 !important; color: #64748b !important; }
 
 /* ── Contribution request cards ── */

@@ -235,6 +235,7 @@ function _renderPagination(containerId, totalPages, currentPage, onPageFn) {
       let html = `
       <div class="_mhdr"><h3><i class="fa-solid fa-pen"></i> Edit Contribution</h3><button class="_mcls" onclick="closeModal()">×</button></div>
       <div class="_mbdy">
+        <div id="ec-member-card" style="display:none;"></div>
         <label class="_fl">Amount (₹)</label><input class="_fi" type="number" id="ec_amt" value="${c.Amount}"/>
         <label class="_fl">Month</label><select class="_fi" id="ec_mon">${mOpts}</select>
         <label class="_fl">Year</label><select class="_fi" id="ec_yr">${yOpts}</select>
@@ -248,6 +249,13 @@ function _renderPagination(containerId, totalPages, currentPage, onPageFn) {
         <button class="_mbtn" style="background:#C1440E;" onclick="saveEditContrib('${id}')"><i class="fa-solid fa-check"></i> Save Changes</button>
       </div>`;
       openModal(html, "460px");
+      // Show who this contribution belongs to (photo + name + mobile, click photo to zoom).
+      // Walk-in / counter entries have no member record, so the card simply stays hidden.
+      try {
+        const _ecU = users.find((u) => String(u.UserId) === String(c.UserId));
+        const _ecEl = document.getElementById("ec-member-card");
+        if (_ecU && _ecEl && typeof window._renderMemberCard === "function") window._renderMemberCard(_ecEl, _ecU);
+      } catch (_e) {}
     }
     async function saveEditContrib(id) {
       let amt  = document.getElementById("ec_amt").value;
@@ -639,6 +647,8 @@ function _renderPagination(containerId, totalPages, currentPage, onPageFn) {
       let filtered = users.filter(u => {
         const matchSearch = (u.Name || "").toLowerCase().includes(sv) || String(u.Mobile || "").includes(sv);
         if (!matchSearch) return false;
+        const _fr = window._userFilterRole || "all";
+        if (_fr !== "all" && (String(u.Role || "User").toLowerCase() === "admin" ? "admin" : "user") !== _fr) return false;
         if (!window._userFilterStatus || window._userFilterStatus === "all") return true;
         return String(u.Status || "Active").toLowerCase() === window._userFilterStatus;
       });
@@ -691,13 +701,19 @@ function _renderPagination(containerId, totalPages, currentPage, onPageFn) {
               <div style="color:#94a3b8;font-size:12px;">Try a different name or mobile number</div>
             </div>
             </td></tr>`
-          : `<tr><td colspan="6" style="text-align:center;padding:36px 20px;">
+          : ((window._userFilterRole && window._userFilterRole !== "all") || (window._userFilterStatus && window._userFilterStatus !== "all") ? `<tr><td colspan="6" style="text-align:center;padding:36px 20px;">
+            <div class="rt-empty-msg">
+              <div style="font-size:2rem;margin-bottom:8px;">👥</div>
+              <div style="font-weight:600;color:#334155;font-size:14px;margin-bottom:4px;">No ${window._userFilterStatus && window._userFilterStatus !== "all" ? window._userFilterStatus + " " : ""}${window._userFilterRole === "admin" ? "admins" : window._userFilterRole === "user" ? "users" : "members"} found</div>
+              <div style="color:#94a3b8;font-size:12px;">Try a different Role or Status tab</div>
+            </div>
+            </td></tr>` : `<tr><td colspan="6" style="text-align:center;padding:36px 20px;">
             <div class="rt-empty-msg">
               <div style="font-size:2rem;margin-bottom:8px;">👥</div>
               <div style="font-weight:600;color:#334155;font-size:14px;margin-bottom:4px;">No members yet</div>
               <div style="color:#94a3b8;font-size:12px;margin-bottom:14px;">Add a member using the form above</div>
             </div>
-            </td></tr>`;
+            </td></tr>`);
         _buildPagination("users_pagination", 1, 0, "_gotoUsersPage");
         return;
       }

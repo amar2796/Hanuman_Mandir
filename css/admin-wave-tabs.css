@@ -251,6 +251,7 @@ body.dark-mode .wave-tab .ct {
 .wave-tab.status-tab.active,
 .wave-tab.status-tab.tab-pending.active,
 .wave-tab.status-tab.tab-rejected.active,
+.wave-tab.status-tab.tab-inactive.active,
 .wave-tab.status-tab.tab-approved.active {
   background: transparent !important;
   border: none !important;
@@ -261,6 +262,7 @@ body.dark-mode .wave-tab.status-tab,
 body.dark-mode .wave-tab.status-tab.active,
 body.dark-mode .wave-tab.status-tab.tab-pending.active,
 body.dark-mode .wave-tab.status-tab.tab-rejected.active,
+body.dark-mode .wave-tab.status-tab.tab-inactive.active,
 body.dark-mode .wave-tab.status-tab.tab-approved.active {
   background: transparent !important;
   border-color: transparent !important;

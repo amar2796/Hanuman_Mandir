@@ -477,6 +477,8 @@
   <script src="js/admin-review-lock.js"></script>
   <script src="js/admin-member-card.js"></script>
   <script src="js/admin-user-review.js"></script>
+  <script src="js/admin-event-review.js"></script>
+  <script src="js/admin-close-guard.js"></script>
 
   <!-- Reusable single-date calendar (Add/Edit User → DOB, Contribution Start Date)
        Deliberately placed here, outside any .page wrapper — those are hidden via
@@ -723,11 +725,67 @@
           <input id="ev_desc" placeholder="Brief description of the event" class="sp-input" />
         </div>
         <div class="sp-actions">
-          <button class="sp-save-btn sp-save-orange" id="spEventSaveBtn" onclick="spSave('event')">
+          <button class="sp-save-btn sp-save-orange" id="spEventSaveBtn" onclick="spEventReview()">
             <span class="sp-btn-text"><i class="fa-solid fa-plus"></i> Save Event</span>
             <span class="sp-btn-spinner" style="display:none;"><i class="fa-solid fa-spinner fa-spin"></i> Saving…</span>
           </button>
           <button class="sp-cancel-btn" onclick="spClose()">Cancel</button>
+        </div>
+      </div>
+      <!-- ── Create Event: Review step (fields locked until double-click, see js/admin-review-lock.js) ── -->
+      <div id="sp-event-review" style="display:none;">
+        <div style="background:linear-gradient(135deg,#fef9ee,#fff8e1);border:1.5px solid #C1440E55;border-radius:12px;padding:12px 16px;margin-bottom:16px;font-size:12.5px;color:#946c44;">
+          <i class="fa-solid fa-circle-info"></i> Review the details below. <b>Double-click a field</b> to edit it before saving the event.
+        </div>
+        <div class="sp-field-group">
+          <label class="sp-label">Event Name</label>
+          <input id="rev_name" class="sp-input" />
+        </div>
+        <div class="sp-row2">
+          <div class="sp-field-group">
+            <label class="sp-label">Category</label>
+            <select id="rev_cat" class="sp-input">
+              <option>Festival</option>
+              <option>Pooja</option>
+              <option>Maintenance</option>
+              <option>Community</option>
+              <option>Other</option>
+            </select>
+          </div>
+          <div class="sp-field-group">
+            <label class="sp-label">Status</label>
+            <select id="rev_status" class="sp-input">
+              <option value="Upcoming">Upcoming</option>
+              <option value="Active">Active</option>
+              <option value="Completed">Completed</option>
+            </select>
+          </div>
+        </div>
+        <div class="sp-row2">
+          <div class="sp-field-group">
+            <label class="sp-label">Start Date</label>
+            <input type="date" id="rev_start" class="sp-input" />
+          </div>
+          <div class="sp-field-group">
+            <label class="sp-label">End Date</label>
+            <input type="date" id="rev_end" class="sp-input" />
+          </div>
+        </div>
+        <div class="sp-field-group">
+          <label class="sp-label">Budget (₹) <span class="sp-optional">(0 = no budget)</span></label>
+          <input type="number" id="rev_budget" min="0" class="sp-input" />
+        </div>
+        <div class="sp-field-group">
+          <label class="sp-label">Description</label>
+          <input id="rev_desc" class="sp-input" />
+        </div>
+        <div class="sp-actions">
+          <button class="sp-save-btn sp-save-orange" id="spEventConfirmBtn" onclick="spEventConfirm()">
+            <i class="fa-solid fa-check"></i> Confirm &amp; Save Event
+          </button>
+          <button class="sp-cancel-btn" onclick="spEventReviewBack()">
+            <i class="fa-solid fa-arrow-left"></i> Back
+          </button>
         </div>
       </div>
       <div id="sp-event-preview" style="display:none;">
@@ -1013,6 +1071,7 @@
       if (form) form.style.display = '';
       if (preview) preview.style.display = 'none';
       if (typeof window._userReviewHide === 'function') window._userReviewHide(); // Add User review step
+      if (typeof window._eventReviewHide === 'function') window._eventReviewHide(); // Create Event review step
 
       // For contrib: if body was replaced by success/error state, restore the form
       if (type === 'contrib') {
@@ -1106,6 +1165,8 @@
        ask before discarding whatever the admin has typed so far. ── */
     window.spBackdropClick = function() {
       if (!_currentPanel) return;
+      // admin-close-guard.js: ask first if something is typed OR a save is still running
+      if (typeof window._cgPanelClose === 'function') { window._cgPanelClose(); return; }
       if (_spPanelIsDirty()) {
         var db = document.getElementById('spDiscardBox');
         if (db) db.classList.add('sp-discard-active');

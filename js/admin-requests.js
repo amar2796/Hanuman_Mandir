@@ -442,15 +442,29 @@
       // the text form from constants.js (APP.currencyText, e.g. "Rs.") instead.
       // Same font limit applies to the typographic minus (−) used for negative balances → plain "-".
       const _pdfCur = (typeof APP !== "undefined" && APP.currencyText) ? APP.currencyText : "Rs.";
+      const _pdfClean = td => td.textContent.trim().replace(/₹\s*/g, _pdfCur + " ").replace(/\u2212/g, "-");
       const rows = Array.from(tbody.querySelectorAll("tr")).map(tr =>
-        Array.from(tr.querySelectorAll("td")).map(td => td.textContent.trim().replace(/₹\s*/g, _pdfCur + " ").replace(/\u2212/g, "-"))
+        Array.from(tr.querySelectorAll("td")).map(_pdfClean)
       );
-      const heads = ["Year", "Opening", "Collection", "Expenses", "Closing", "Carry →"];
+      // Headings come from the on-screen table so the PDF always has one heading per column
+      // (it used to print 6 headings over 9 columns). The "→" arrow can't be drawn by the PDF font.
+      const _table = tbody.closest("table");
+      let heads = _table ? Array.from(_table.querySelectorAll("thead th")).map(th => th.textContent.replace(/→/g, "").trim()) : [];
+      if (!heads.length || heads.length !== (rows[0] || []).length) {
+        heads = ["Year", "Opening Balance", "Total Collection", "Total Expenses", "Closing Balance", "Carry-forward", "Receipts", "Members", "Avg/Receipt"].slice(0, (rows[0] || []).length || 9);
+      }
+      // "All Years" totals row from the on-screen footer, if present
+      const _tf = document.getElementById("ys_tfoot");
+      const foot = _tf ? Array.from(_tf.querySelectorAll("tr")).map(tr => Array.from(tr.querySelectorAll("td")).map(_pdfClean)).filter(r => r.length === heads.length) : [];
       if (typeof doc.autoTable === "function") {
+        const _right = {};
+        for (let c = 1; c < heads.length; c++) _right[c] = { halign: "right" };
         doc.autoTable({
-          head: [heads], body: rows, startY: Y, margin: { left: margin, right: margin },
-          headStyles: { fillColor: [30, 41, 64], textColor: [15, 118, 110], fontSize: 9 },
-          bodyStyles: { fontSize: 9 }, alternateRowStyles: { fillColor: [250, 248, 243] }
+          head: [heads], body: rows, foot: foot, startY: Y, margin: { left: margin, right: margin },
+          headStyles: { fillColor: [30, 41, 64], textColor: [15, 118, 110], fontSize: 7.5 },
+          bodyStyles: { fontSize: 7.5 }, alternateRowStyles: { fillColor: [250, 248, 243] },
+          footStyles: { fillColor: [241, 245, 249], textColor: [30, 41, 64], fontSize: 7.5, fontStyle: "bold" },
+          columnStyles: _right
         });
       } else {
         doc.setFontSize(9); doc.text("(Install jspdf-autotable for formatted table)", margin, Y);

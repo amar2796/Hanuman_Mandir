@@ -1160,7 +1160,10 @@ function openModal(html, maxWidth){
   let overlay=document.createElement("div"); overlay.id="_uniModal";
   overlay.innerHTML=`<div class="_mbox" style="max-width:${maxWidth||"530px"};">${html}</div>`;
   overlay.addEventListener("click",e=>{
-    if(e.target===overlay && !overlay._confirmInProgress) closeModal();
+    if(e.target===overlay && !overlay._confirmInProgress){
+      // admin-close-guard.js asks first if something was typed or a save is running
+      if(typeof window._cgModalBackdrop==="function") window._cgModalBackdrop(); else closeModal();
+    }
   });
   document.body.appendChild(overlay); document.body.style.overflow="hidden";
 }

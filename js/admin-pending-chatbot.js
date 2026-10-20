@@ -7,17 +7,35 @@
       renderUsers();
     }
 
+    /* ── Role filter (Admin / User) — first level above the status tabs ── */
+    var _userFilterRole = "all";
+    function _userRoleOf(u) { return String((u && u.Role) || "User").toLowerCase() === "admin" ? "admin" : "user"; }
+    function filterUserRole(role, btnEl) {
+      window._userFilterRole = role;
+      document.querySelectorAll("#userRoleTabs .ur-btn").forEach(b => b.classList.remove("active"));
+      if (btnEl) btnEl.classList.add("active");
+      renderUsers();   // re-filters the list AND refreshes the status counts for this role
+    }
+
     /* ── Update tab counts + sidebar badge ── */
     function updateUserTabCounts(users) {
       if (!users) return;
-      const all = users.length;
-      const pending = users.filter(u => String(u.Status || "Active").toLowerCase() === "pending").length;
-      const approved = users.filter(u => String(u.Status || "Active").toLowerCase() === "active").length;
-      const rejected = users.filter(u => String(u.Status || "Active").toLowerCase() === "rejected").length;
+      const role = window._userFilterRole || "all";
+      // Role buttons always show totals for everyone
       const setEl = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
-      setEl("ct_all", all); setEl("ct_pending", pending);
-      setEl("ct_approved", approved); setEl("ct_rejected", rejected);
-      // Sidebar badge
+      setEl("rc_all", users.length);
+      setEl("rc_admin", users.filter(u => _userRoleOf(u) === "admin").length);
+      setEl("rc_user", users.filter(u => _userRoleOf(u) === "user").length);
+      // Status tabs count only the selected role
+      const scoped = role === "all" ? users : users.filter(u => _userRoleOf(u) === role);
+      const stOf = u => String(u.Status || "Active").toLowerCase();
+      setEl("ct_all", scoped.length);
+      setEl("ct_pending",  scoped.filter(u => stOf(u) === "pending").length);
+      setEl("ct_active",   scoped.filter(u => stOf(u) === "active").length);
+      setEl("ct_inactive", scoped.filter(u => stOf(u) === "inactive").length);
+      setEl("ct_rejected", scoped.filter(u => stOf(u) === "rejected").length);
+      // Sidebar badge always counts ALL pending users (not role-filtered)
+      const pending = users.filter(u => stOf(u) === "pending").length;
       const badge = document.getElementById("pendingBadge");
       if (badge) {
         badge.textContent = pending;
@@ -211,4 +229,4 @@
     //  ALL PRIORITY CHANGES — admin.html additions
     // ════════════════════════════════════════════════════════════════
 
-    // ── M18: Show version in sidebar
+    // ── M18: Show version in sidebar

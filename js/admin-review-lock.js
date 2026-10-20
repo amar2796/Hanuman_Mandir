@@ -34,6 +34,7 @@
     "#wprev_name", "#wprev_mobile", "#wprev_email", "#wprev_amount", "#wprev_month",
     "#wprev_year", "#wprev_type", "#wprev_occasion", "#wprev_note",
     "#ru_name", "#ru_mobile", "#ru_email", "#ru_role",
+    "#rev_name", "#rev_cat", "#rev_status", "#rev_start", "#rev_end", "#rev_budget", "#rev_desc",
     ".bkprev-amt"
   ].join(",");
 

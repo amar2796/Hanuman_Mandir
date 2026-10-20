@@ -11,12 +11,20 @@
           </div>
         </div>
         <div class="card-v2">
+          <!-- Role filter (first level): Admin / User. The status tabs below show counts for the chosen role. -->
+          <div class="ur-bar" id="userRoleTabs" role="tablist" aria-label="Filter by role">
+            <span class="ur-lbl">Role</span>
+            <button type="button" class="ur-btn active" data-role="all" onclick="filterUserRole('all',this)"><i class="fa-solid fa-users"></i> All <span class="ur-ct" id="rc_all">0</span></button>
+            <button type="button" class="ur-btn" data-role="admin" onclick="filterUserRole('admin',this)"><i class="fa-solid fa-user-shield"></i> Admin <span class="ur-ct" id="rc_admin">0</span></button>
+            <button type="button" class="ur-btn" data-role="user" onclick="filterUserRole('user',this)"><i class="fa-solid fa-user"></i> User <span class="ur-ct" id="rc_user">0</span></button>
+          </div>
           <h3>
             <span><i class="fa-solid fa-users-gear"></i> Manage Users <span style="font-size:11px;font-weight:400;color:#999;">(click row to view · edit via button)</span></span>
             <div class="wave-bar status-tabs" id="userStatusTabs" style="margin-left:auto;">
               <button class="wave-tab status-tab active" data-color="#334155" onclick="filterUsers('all',this)"><i class="fa-solid fa-list"></i> All <span class="tab-ct" id="ct_all">0</span></button>
               <button class="wave-tab status-tab tab-pending" data-color="#d97706" onclick="filterUsers('pending',this)"><i class="fa-solid fa-clock"></i> Pending <span class="tab-ct" id="ct_pending">0</span></button>
-              <button class="wave-tab status-tab tab-approved" data-color="#16a34a" onclick="filterUsers('active',this)"><i class="fa-solid fa-circle-check"></i> Approved <span class="tab-ct" id="ct_approved">0</span></button>
+              <button class="wave-tab status-tab tab-approved" data-color="#16a34a" onclick="filterUsers('active',this)"><i class="fa-solid fa-circle-check"></i> Active <span class="tab-ct" id="ct_active">0</span></button>
+              <button class="wave-tab status-tab tab-inactive" data-color="#64748b" onclick="filterUsers('inactive',this)"><i class="fa-solid fa-circle-pause"></i> Inactive <span class="tab-ct" id="ct_inactive">0</span></button>
               <button class="wave-tab status-tab tab-rejected" data-color="#dc2626" onclick="filterUsers('rejected',this)"><i class="fa-solid fa-circle-xmark"></i> Rejected <span class="tab-ct" id="ct_rejected">0</span></button>
             </div>
           </h3>
