@@ -574,6 +574,20 @@ function _renderPagination(containerId, totalPages, currentPage, onPageFn) {
       let mOpts = MONTHS.map(
         (x) => `<option ${x === mn ? "selected" : ""}>${x}</option>`
       ).join("");
+      // Year dropdown: every year seen in expenses + current/next year, plus this expense's own year
+      let _eeCurYear = String(e.Year || new Date().getFullYear());
+      let eyOpts = Array.from(
+        new Set([
+          ...expenses.map((x) => Number(x.Year)),
+          Number(_eeCurYear),
+          new Date().getFullYear(),
+          new Date().getFullYear() + 1,
+        ])
+      )
+        .filter((y) => y > 2000)
+        .sort((x, y) => y - x)
+        .map((y) => `<option ${_eeCurYear === String(y) ? "selected" : ""}>${y}</option>`)
+        .join("");
       let html = `
       <div class="_mhdr"><h3><i class="fa-solid fa-pen"></i> Edit Expense</h3><button class="_mcls" onclick="closeModal()">×</button></div>
       <div class="_mbdy">
@@ -584,6 +598,7 @@ function _renderPagination(containerId, totalPages, currentPage, onPageFn) {
         }"/>
         <label class="_fl">Expense Type</label><select class="_fi" id="ee_type">${tOpts}</select>
         <label class="_fl">Month</label><select class="_fi" id="ee_mon"><option value="">None</option>${mOpts}</select>
+        <label class="_fl">Year</label><select class="_fi" id="ee_yr">${eyOpts}</select>
       </div>
       <div class="_mft">
         <button class="_mbtn" style="background:#999;" onclick="closeModal()">Cancel</button>
@@ -601,7 +616,7 @@ function _renderPagination(containerId, totalPages, currentPage, onPageFn) {
           Amount: document.getElementById("ee_amt").value,
           ExpenseTypeId: document.getElementById("ee_type").value,
           ForMonth: document.getElementById("ee_mon").value,
-          Year: yr,
+          Year: (document.getElementById("ee_yr") || {}).value || yr,
         });
         toast(
           res.status === "updated"
@@ -1370,7 +1385,7 @@ function _renderPagination(containerId, totalPages, currentPage, onPageFn) {
       if (!panelBody) return;
       panelBody.innerHTML = `
         <div class="sp-steps" id="sp-bulk-steps"></div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
+        <div style="display:grid;grid-template-columns:1fr;gap:10px;margin-bottom:14px;">
           <div><label class="_fl">Member <span style="color:#e74c3c">*</span></label>
             <div id="bk_user_cmbWrap" style="position:relative;">
               <div id="bk_user_cmbBtn" class="_fi" onclick="_cmbToggle('bk_user')" tabindex="0" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none;margin-bottom:0;">
@@ -1382,11 +1397,13 @@ function _renderPagination(containerId, totalPages, currentPage, onPageFn) {
             <select class="_fi" id="bk_user" onchange="_updateBkMemberPreview(this.value)" style="display:none;">${userOpts}</select>
             <div id="bk-member-preview" style="display:none;align-items:center;gap:8px;margin-top:8px;padding:7px 10px;background:#f8fafc;border:1px solid #eef2f6;border-radius:8px;"></div>
           </div>
-          <div><label class="_fl">Year <span style="color:#e74c3c">*</span></label><select class="_fi" id="bk_year">${yearOpts}</select></div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
+          <div><label class="_fl">Year <span style="color:#e74c3c">*</span></label><select class="_fi" id="bk_year">${yearOpts}</select></div>
           <div><label class="_fl">Contribution Type <span style="color:#e74c3c">*</span></label><select class="_fi" id="bk_type">${typeOpts}</select></div>
-          <div><label class="_fl">Note <span style="font-size:10px;color:#94a3b8;font-weight:400;">(optional)</span></label><input class="_fi" id="bk_note" placeholder="e.g. Annual"/></div>
+        </div>
+        <div style="margin-bottom:14px;">
+          <label class="_fl">Note <span style="font-size:10px;color:#94a3b8;font-weight:400;">(optional)</span></label><input class="_fi" id="bk_note" placeholder="e.g. Annual"/>
         </div>
 
         <!-- Running total, pinned above the row list so it's always visible -->
@@ -1470,7 +1487,7 @@ function _renderPagination(containerId, totalPages, currentPage, onPageFn) {
           <div class="_mhdr"><h3><i class="fa-solid fa-eye" style="color:#C1440E;margin-right:6px;"></i> Preview & Confirm Bulk Insert</h3><button class="_mcls" onclick="closeModal()">&#xd7;</button></div>
           <div class="_mbdy">
             <div style="background:linear-gradient(135deg,#fef9ee,#fff8e1);border:1.5px solid #C1440E44;border-radius:12px;padding:12px 16px;margin-bottom:14px;font-size:12.5px;color:#946c44;">
-              <i class="fa-solid fa-circle-info"></i> Review details below. <b>Edit amounts inline</b> or remove a row before confirming.
+              <i class="fa-solid fa-circle-info"></i> Review details below. <b>Double-click an amount</b> to edit it, or remove a row before confirming.
             </div>
             <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:12px 16px;margin-bottom:14px;font-size:12.5px;">
               <div style="display:grid;grid-template-columns:auto 1fr;gap:4px 16px;">
@@ -1513,7 +1530,7 @@ function _renderPagination(containerId, totalPages, currentPage, onPageFn) {
       bkPanelBody.innerHTML = `
         <div class="sp-steps">${spStepsBar(2)}</div>
         <div style="background:linear-gradient(135deg,#fef9ee,#fff8e1);border:1.5px solid #C1440E55;border-radius:12px;padding:12px 16px;margin-bottom:16px;font-size:12.5px;color:#946c44;">
-          <i class="fa-solid fa-circle-info"></i> Review details below. <b>Edit amounts inline</b> or remove a row before confirming.
+          <i class="fa-solid fa-circle-info"></i> Review details below. <b>Double-click an amount</b> to edit it, or remove a row before confirming.
         </div>
         <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:12.5px;">
           <div style="display:grid;grid-template-columns:auto 1fr;gap:4px 16px;">

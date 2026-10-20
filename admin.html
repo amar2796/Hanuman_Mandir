@@ -474,6 +474,9 @@
   <script src="js/admin-contribution-filter.js"></script>
   <script src="js/admin-features-misc.js"></script>
   <script src="js/admin-email-automation.js"></script>
+  <script src="js/admin-review-lock.js"></script>
+  <script src="js/admin-member-card.js"></script>
+  <script src="js/admin-user-review.js"></script>
 
   <!-- Reusable single-date calendar (Add/Edit User → DOB, Contribution Start Date)
        Deliberately placed here, outside any .page wrapper — those are hidden via
@@ -803,11 +806,59 @@
           </div>
         </div>
         <div class="sp-actions">
-          <button class="sp-save-btn sp-save-indigo" id="spUserSaveBtn" onclick="spSave('user')">
+          <button class="sp-save-btn sp-save-indigo" id="spUserSaveBtn" onclick="spUserReview()">
             <span class="sp-btn-text"><i class="fa-solid fa-user-check"></i> Add User</span>
             <span class="sp-btn-spinner" style="display:none;"><i class="fa-solid fa-spinner fa-spin"></i> Saving…</span>
           </button>
           <button class="sp-cancel-btn" onclick="spClose()">Cancel</button>
+        </div>
+      </div>
+      <!-- ── Add User: Review step (fields locked until double-click, see js/admin-review-lock.js) ── -->
+      <div id="sp-user-review" style="display:none;">
+        <div style="background:linear-gradient(135deg,#fef9ee,#fff8e1);border:1.5px solid #C1440E55;border-radius:12px;padding:12px 16px;margin-bottom:16px;font-size:12.5px;color:#946c44;">
+          <i class="fa-solid fa-circle-info"></i> Review the details below. <b>Double-click a field</b> to edit it before adding the user.
+        </div>
+        <div class="sp-row2">
+          <div class="sp-field-group">
+            <label class="sp-label">Full Name</label>
+            <input id="ru_name" class="sp-input" />
+          </div>
+          <div class="sp-field-group">
+            <label class="sp-label">Mobile</label>
+            <input id="ru_mobile" type="tel" maxlength="10" class="sp-input" />
+          </div>
+        </div>
+        <div class="sp-row2">
+          <div class="sp-field-group">
+            <label class="sp-label">Email</label>
+            <input id="ru_email" type="email" class="sp-input" />
+          </div>
+          <div class="sp-field-group">
+            <label class="sp-label">Role</label>
+            <select id="ru_role" class="sp-input">
+              <option>User</option>
+              <option>Admin</option>
+            </select>
+          </div>
+        </div>
+        <div class="sp-row2">
+          <div class="sp-field-group">
+            <label class="sp-label">Date of Birth</label>
+            <div id="ru_dob_txt" class="sp-input" style="background:#f8fafc;"></div>
+          </div>
+          <div class="sp-field-group">
+            <label class="sp-label">Contribution Start Date</label>
+            <div id="ru_cstart_txt" class="sp-input" style="background:#f8fafc;"></div>
+          </div>
+        </div>
+        <div style="font-size:11.5px;color:#64748b;margin:2px 0 4px;"><i class="fa-solid fa-lock" style="color:#16a34a;"></i> Default password <b style="font-family:monospace;color:#15803d;">JaiShreeRam</b> (auto-set) — the user must change it on first login. To change the dates, go Back.</div>
+        <div class="sp-actions">
+          <button class="sp-save-btn sp-save-indigo" id="spUserConfirmBtn" onclick="spUserConfirm()">
+            <i class="fa-solid fa-user-check"></i> Confirm &amp; Add User
+          </button>
+          <button class="sp-cancel-btn" onclick="spUserReviewBack()">
+            <i class="fa-solid fa-arrow-left"></i> Back
+          </button>
         </div>
       </div>
       <div id="sp-user-preview" style="display:none;">
@@ -961,6 +1012,7 @@
       var preview = document.getElementById('sp-' + type + '-preview');
       if (form) form.style.display = '';
       if (preview) preview.style.display = 'none';
+      if (typeof window._userReviewHide === 'function') window._userReviewHide(); // Add User review step
 
       // For contrib: if body was replaced by success/error state, restore the form
       if (type === 'contrib') {
@@ -1039,6 +1091,13 @@
         var f = fields[i];
         if (f.type === 'hidden') continue;
         if (f.value && String(f.value).trim() !== '') return true;
+      }
+      /* Bulk Insert: a member picked with nothing typed yet is still real work
+         in progress (member dropdown starts empty, so a value means the admin
+         chose it) — guard it too, so an outside click can't silently drop it. */
+      if (_currentPanel === 'bulk') {
+        var bkU = document.getElementById('bk_user');
+        if (bkU && bkU.value) return true;
       }
       return false;
     }

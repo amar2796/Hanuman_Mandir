@@ -267,7 +267,7 @@
         </div>
         <div class="_mbdy">
           <div style="background:linear-gradient(135deg,#fef9ee,#fff8e1);border:1.5px solid #C1440E44;border-radius:12px;padding:14px 16px;margin-bottom:16px;font-size:12.5px;color:#946c44;">
-            <i class="fa-solid fa-circle-info"></i> Review the details below. You can <b>edit any field inline</b> before submitting.
+            <i class="fa-solid fa-circle-info"></i> Review the details below. <b>Double-click a field</b> to edit it before submitting.
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
             <div>
@@ -325,7 +325,7 @@
         contribPanelBody.innerHTML = `
           <div class="sp-steps">${spStepsBar(2)}</div>
           <div style="background:linear-gradient(135deg,#fef9ee,#fff8e1);border:1.5px solid #C1440E55;border-radius:12px;padding:12px 16px;margin-bottom:16px;font-size:12px;color:#946c44;">
-            <i class="fa-solid fa-circle-info"></i> Review the details below. <b>Edit any field inline</b> before submitting.
+            <i class="fa-solid fa-circle-info"></i> Review the details below. <b>Double-click a field</b> to edit it before submitting.
           </div>
           <div class="sp-row2">
             <div class="sp-field-group">
@@ -812,7 +812,7 @@
       expPanelBody.innerHTML = `
         <div class="sp-steps">${spStepsBar(2)}</div>
         <div style="background:linear-gradient(135deg,#fef2f2,#fee2e2);border:1.5px solid #e74c3c44;border-radius:12px;padding:12px 16px;margin-bottom:16px;font-size:12px;color:#991b1b;">
-          <i class="fa-solid fa-circle-info"></i> Review the details below. <b>Edit any field inline</b> before submitting.
+          <i class="fa-solid fa-circle-info"></i> Review the details below. <b>Double-click a field</b> to edit it before submitting.
         </div>
         <div class="sp-field-group">
           <label class="sp-label">Title</label>
@@ -995,7 +995,7 @@
       expPanelBody.innerHTML = `
         <div class="sp-steps">${spStepsBar(2)}</div>
         <div style="background:linear-gradient(135deg,#fef2f2,#fee2e2);border:1.5px solid #e74c3c44;border-radius:12px;padding:12px 16px;margin-bottom:16px;font-size:12px;color:#991b1b;">
-          <i class="fa-solid fa-circle-info"></i> Review the details below. <b>Edit any field inline</b> before submitting.
+          <i class="fa-solid fa-circle-info"></i> Review the details below. <b>Double-click a field</b> to edit it before submitting.
         </div>
         <div class="sp-field-group">
           <label class="sp-label">Title</label>

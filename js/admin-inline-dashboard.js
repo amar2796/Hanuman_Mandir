@@ -463,6 +463,8 @@ var dash_contributions = [];
       if (typeof window.jspdf === "undefined") { toast("PDF library not loaded.", "error"); return; }
       const { jsPDF } = window.jspdf;
       const doc  = new jsPDF("p","mm","a4");
+      // Helvetica can't draw ₹ in jsPDF — use the PDF-safe text form from constants.js ("Rs.")
+      const _pdfCur = APP.currencyText || "Rs.";
       const w    = doc.internal.pageSize.getWidth();
       const fYear  = _dash_activeTab === "contrib"
         ? (document.getElementById("ct_filterYear")?.value  || dash_selectedYear)
@@ -482,23 +484,23 @@ var dash_contributions = [];
         const paidRows = _ct_filtered.filter(r => r._type === "paid");
         const totalC   = paidRows.reduce((s,r) => s + Number(r._data.Amount||0), 0);
         doc.setFontSize(8); doc.setTextColor(50,50,50); doc.setFont(undefined,"normal");
-        doc.text(`Total: ${APP.currency||"₹"}${Number(totalC).toLocaleString(APP.locale||"en-IN")}  |  Records: ${paidRows.length}  |  Generated: ${new Date().toLocaleDateString(APP.locale||"en-IN")}`, 14, 30);
+        doc.text(`Total: ${_pdfCur}${Number(totalC).toLocaleString(APP.locale||"en-IN")}  |  Records: ${paidRows.length}  |  Generated: ${new Date().toLocaleDateString(APP.locale||"en-IN")}`, 14, 30);
         rows = paidRows.map(r => {
           const c = r._data;
           const name  = dash_getDisplayName(c.UserId, c.Note);
           const wk    = String(c.UserId).startsWith("WALKIN_");
           const tName = dash_types.find(x => String(x.TypeId) === String(c.TypeId))?.TypeName || "Contribution";
           const oName = dash_occasions.find(x => String(x.OccasionId) === String(c.OccasionId))?.OccasionName || "—";
-          return [_ct_fmtDate(c.PaymentDate), wk ? name+" (Counter)" : name, tName, c.ForMonth||"—", oName, `+${APP.currency||"₹"}${Number(c.Amount||0).toLocaleString(APP.locale||"en-IN")}`];
+          return [_ct_fmtDate(c.PaymentDate), wk ? name+" (Counter)" : name, tName, c.ForMonth||"—", oName, `+${_pdfCur}${Number(c.Amount||0).toLocaleString(APP.locale||"en-IN")}`];
         });
         doc.autoTable({ head:[["Date","Name","Type","Month","Occasion","Amount"]], body:rows, startY:35, theme:"grid", headStyles:{fillColor:[51,65,85],fontStyle:"bold"}, styles:{fontSize:8}, alternateRowStyles:{fillColor:[253,251,247]} });
       } else {
         const totalE = _et_filtered.reduce((s,e) => s + Number(e.Amount||0), 0);
         doc.setFontSize(8); doc.setTextColor(50,50,50); doc.setFont(undefined,"normal");
-        doc.text(`Total: ${APP.currency||"₹"}${Number(totalE).toLocaleString(APP.locale||"en-IN")}  |  Records: ${_et_filtered.length}  |  Generated: ${new Date().toLocaleDateString(APP.locale||"en-IN")}`, 14, 30);
+        doc.text(`Total: ${_pdfCur}${Number(totalE).toLocaleString(APP.locale||"en-IN")}  |  Records: ${_et_filtered.length}  |  Generated: ${new Date().toLocaleDateString(APP.locale||"en-IN")}`, 14, 30);
         rows = _et_filtered.map(e => {
           const tName = dash_expenseTypes.find(x => String(x.ExpenseTypeId) === String(e.ExpenseTypeId))?.Name || "Expense";
-          return [_ct_fmtDate(e.PaymentDate), e.Title||"—", tName, e.ForMonth||"—", `-${APP.currency||"₹"}${Number(e.Amount||0).toLocaleString(APP.locale||"en-IN")}`];
+          return [_ct_fmtDate(e.PaymentDate), e.Title||"—", tName, e.ForMonth||"—", `-${_pdfCur}${Number(e.Amount||0).toLocaleString(APP.locale||"en-IN")}`];
         });
         doc.autoTable({ head:[["Date","Title","Type","Month","Amount"]], body:rows, startY:35, theme:"grid", headStyles:{fillColor:[231,76,60],fontStyle:"bold"}, styles:{fontSize:8}, alternateRowStyles:{fillColor:[255,250,250]} });
       }

@@ -121,7 +121,7 @@
         </div>
         <div class="_mbdy">
           <div style="background:linear-gradient(135deg,#fff8e8,#fef3cd);border:1.5px solid #C1440E44;border-radius:12px;padding:12px 16px;margin-bottom:14px;font-size:12px;color:#946c44;">
-            <i class="fa-solid fa-circle-info"></i> Review all details. <b>Edit any field inline</b> before confirming.
+            <i class="fa-solid fa-circle-info"></i> Review all details. <b>Double-click a field</b> to edit it before confirming.
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
             <div>
@@ -176,7 +176,7 @@
       wiPrevBody.innerHTML = `
         <div class="sp-steps">${spStepsBar(2)}</div>
         <div style="background:linear-gradient(135deg,#fff8e8,#fef3cd);border:1.5px solid #C1440E44;border-radius:12px;padding:12px 16px;margin-bottom:16px;font-size:12px;color:#946c44;">
-          <i class="fa-solid fa-circle-info"></i> Review all details. <b>Edit any field inline</b> before confirming.
+          <i class="fa-solid fa-circle-info"></i> Review all details. <b>Double-click a field</b> to edit it before confirming.
         </div>
         <div class="sp-row2">
           <div class="sp-field-group">

@@ -438,8 +438,12 @@
       doc.setTextColor(30, 41, 64); doc.setFontSize(11); doc.setFont(undefined, "bold");
       doc.text("Year-by-Year Summary", margin, Y); Y += 8;
       // Table
+      // jsPDF's Helvetica can't draw the ₹ glyph (it printed as "¹"), so the PDF uses
+      // the text form from constants.js (APP.currencyText, e.g. "Rs.") instead.
+      // Same font limit applies to the typographic minus (−) used for negative balances → plain "-".
+      const _pdfCur = (typeof APP !== "undefined" && APP.currencyText) ? APP.currencyText : "Rs.";
       const rows = Array.from(tbody.querySelectorAll("tr")).map(tr =>
-        Array.from(tr.querySelectorAll("td")).map(td => td.textContent.trim())
+        Array.from(tr.querySelectorAll("td")).map(td => td.textContent.trim().replace(/₹\s*/g, _pdfCur + " ").replace(/\u2212/g, "-"))
       );
       const heads = ["Year", "Opening", "Collection", "Expenses", "Closing", "Carry →"];
       if (typeof doc.autoTable === "function") {

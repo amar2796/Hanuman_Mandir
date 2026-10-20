@@ -1172,6 +1172,8 @@ var _hmMemberFilter = "all";
       if (!el) return;
       var u = (typeof users !== "undefined" ? users : []).find(function(x) { return String(x.UserId) === String(userId); });
       if (!userId || !u) { el.style.display = "none"; el.innerHTML = ""; return; }
+      // Larger verify card (photo + name + mobile, click photo to zoom) — see admin-member-card.js
+      if (typeof window._renderMemberCard === "function") { window._renderMemberCard(el, u); return; }
       el.style.display = "flex";
       el.innerHTML = _avatarHtml(u, 30) +
         '<div style="min-width:0;">' +
@@ -1187,6 +1189,8 @@ var _hmMemberFilter = "all";
       if (!el) return;
       var u = (typeof users !== "undefined" ? users : []).find(function(x) { return String(x.UserId) === String(userId); });
       if (!userId || !u) { el.style.display = "none"; el.innerHTML = ""; return; }
+      // Larger verify card (photo + name + mobile, click photo to zoom) — see admin-member-card.js
+      if (typeof window._renderMemberCard === "function") { window._renderMemberCard(el, u); return; }
       el.style.display = "flex";
       el.innerHTML = _avatarHtml(u, 30) +
         '<div style="min-width:0;">' +
