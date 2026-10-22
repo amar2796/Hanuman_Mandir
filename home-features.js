@@ -4,7 +4,6 @@
    Frontend-only additions for index.html:
      • Dark mode toggle (preference saved in localStorage)
      • Quick-Pay floating action button (reuses existing openPayModal())
-     • WhatsApp share button for the announcement banner
      • FAQ accordion
    This file makes NO calls to the Apps Script backend and does not
    touch any existing contribution/expense/gallery/feedback logic.
@@ -70,19 +69,6 @@
       window.addEventListener("scroll", onScroll, { passive: true });
       onScroll();
     }
-  
-    /* ── WhatsApp share for the announcement banner ───────────────── */
-  
-    function hfShareAnnouncement() {
-      var textEl = document.getElementById("annText");
-      var msg = (textEl && textEl.textContent.trim())
-        ? textEl.textContent.trim()
-        : "Check out the latest update from our mandir portal.";
-      var url = window.location.href;
-      var waUrl = "https://wa.me/?text=" + encodeURIComponent(msg + "\n" + url);
-      window.open(waUrl, "_blank", "noopener");
-    }
-    window.hfShareAnnouncement = hfShareAnnouncement;
   
     /* ── FAQ accordion ─────────────────────────────────────────────── */
   

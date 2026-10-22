@@ -599,11 +599,11 @@
     }
   
     function _answerContact() {
-      var ph = _cfg("contact_phone"), em = _cfg("contact_email"), wa = _cfg("contact_whatsapp");
+      var ph = _cfg("contact_phone"), em = _cfg("contact_email");
       // Fall back to APP constants if config empty
       if (!ph && window.APP && APP.phone) ph = APP.phone;
       if (!em && window.APP && APP.email) em = APP.email;
-      if (!ph && !em && !wa) {
+      if (!ph && !em) {
         _addBotMsg(_bi(
           "Contact details have not been set yet. Please visit in person.",
           "संपर्क विवरण उपलब्ध नहीं है।"
@@ -612,7 +612,6 @@
         var lines = _bi("Contact Us:\n\n", "संपर्क करें:\n\n");
         lines += _biLine("Phone: ",     "फोन: ",   ph);
         lines += _biLine("Email: ",     "ईमेल: ",  em);
-        lines += wa ? "WhatsApp: " + wa : "";
         _addBotMsg(lines.trim());
       }
       _showBackMenu();
@@ -633,7 +632,7 @@
         donate:   ["donat","daan","contribute","contribution","how to","kaise","paisa","money"],
         bank:     ["bank","account","transfer","ifsc","neft","rtgs"],
         upi:      ["upi","qr","scan","pay","bhim","gpay","phonepe","paytm","bhugtan"],
-        contact:  ["contact","phone","call","number","email","whatsapp","sampark"]
+        contact:  ["contact","phone","call","number","email","sampark"]
       };
       for (var topic in kw) {
         if (kw[topic].some(function (w) { return lower.indexOf(w) !== -1; })) {

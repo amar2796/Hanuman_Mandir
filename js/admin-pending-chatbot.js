@@ -147,7 +147,7 @@
             "welcome_en", "welcome_hi", "timings_en", "timings_hi",
             "location_en", "location_hi", "donate_en", "donate_hi",
             "bank_name", "bank_account", "bank_ifsc", "bank_branch",
-            "upi_id", "contact_phone", "contact_email", "contact_whatsapp",
+            "upi_id", "contact_phone", "contact_email",
             "custom_q1_en", "custom_q1_hi", "custom_a1_en", "custom_a1_hi",
             "custom_q2_en", "custom_q2_hi", "custom_a2_en", "custom_a2_hi"
           ];
@@ -175,7 +175,7 @@
         "welcome_en", "welcome_hi", "timings_en", "timings_hi",
         "location_en", "location_hi", "donate_en", "donate_hi",
         "bank_name", "bank_account", "bank_ifsc", "bank_branch",
-        "upi_id", "contact_phone", "contact_email", "contact_whatsapp",
+        "upi_id", "contact_phone", "contact_email",
         "custom_q1_en", "custom_q1_hi", "custom_a1_en", "custom_a1_hi",
         "custom_q2_en", "custom_q2_hi", "custom_a2_en", "custom_a2_hi"
       ];

@@ -357,6 +357,8 @@ window._retryExpenseAsIs = _retryExpenseAsIs;
           Mobile: mobile,
           Email:  email,
           Role:   role,
+          // Access level only matters for Admin accounts (the server ignores it otherwise)
+          AccessLevel: (role === "Admin" && document.getElementById("u_access")) ? document.getElementById("u_access").value : "",
           DOB:    dob,
           ContribStartDate: contribStart,
         });
@@ -370,6 +372,8 @@ window._retryExpenseAsIs = _retryExpenseAsIs;
           if (_dobEl) _dobEl.value = "";
           const _csEl = document.getElementById("u_contrib_start");
           if (_csEl) _csEl.value = "";
+          const _acEl = document.getElementById("u_access");
+          if (_acEl) _acEl.value = "Viewer";
           smartRefresh("users");
         }
       } catch (err) {

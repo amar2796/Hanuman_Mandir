@@ -2852,7 +2852,6 @@ textarea:focus-visible {
   color: #fff; font-size: 1.1rem;
   box-shadow: 0 4px 12px rgba(122,31,31,0.3);
 }
-.visit-icon.is-whatsapp { background: linear-gradient(135deg, #25D366, #128C7E); box-shadow: 0 4px 12px rgba(18,140,126,0.3); }
 .visit-label {
   font-size: 0.72rem; font-weight: 700; letter-spacing: 0.08em;
   text-transform: uppercase; color: var(--color-brand); margin-top: 4px;
@@ -2867,7 +2866,6 @@ textarea:focus-visible {
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 .visit-btn:hover, .visit-btn:focus-visible { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(122,31,31,0.3); }
-.visit-btn.is-whatsapp { background: #1FA855; }
 .visit-timings { grid-column: 1 / -1; align-items: stretch; text-align: left; }
 .visit-timings .visit-icon, .visit-timings .visit-label { align-self: center; }
 .visit-timings ul {
@@ -3056,7 +3054,6 @@ body { background: linear-gradient(135deg, var(--bg-page) 0%, #FBF3E6 100%); }
   background: linear-gradient(135deg, var(--color-brand), var(--color-primary-dark));
   box-shadow: 0 4px 12px rgba(122,31,31,0.28);
 }
-.visit-action.is-whatsapp .va-icon { background: linear-gradient(135deg,#25D366,#128C7E); box-shadow: 0 4px 12px rgba(18,140,126,0.3); }
 .va-text { display: flex; flex-direction: column; min-width: 0; flex: 1; }
 .va-label { font-size: 0.7rem; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; color: var(--color-brand); }
 .va-value { font-size: 0.95rem; font-weight: 500; color: var(--polish-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

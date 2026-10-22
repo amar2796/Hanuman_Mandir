@@ -263,7 +263,7 @@ function getData(action,_sAttempt,_nAttempt){
   return slow();
 }
 // Writes: remember "data just changed" so reads use the live sheet for 3 minutes (Firestore catches up within ~1-2 min).
-var _FB_WRITE_RE=/^(add|update|delete|approve|reject|restore|reset|change|resolve|register|verify|submit|edit|save|remove|upload|clear|toggle|send)/i;
+var _FB_WRITE_RE=/^(add|update|delete|approve|reject|restore|reset|change|resolve|register|verify|submit|edit|save|remove|upload|clear|toggle|send|setYearLock|setAccessLevel)/i;
 function postData(data){
   try{if(data&&_FB_WRITE_RE.test(String(data.action||"")))localStorage.setItem("fb_stale_until",String(Date.now()+3*60*1000));}catch(e){}
   return window._fbReady.then(function(){return _postDataRaw(data);});
@@ -1459,30 +1459,6 @@ function _displayRID(c) {
   return (c.ReceiptID || "—").replace(new RegExp("^" + legacy + "-"), prefix + "-");
 }
 
-/** Builds the WhatsApp text body for a contribution receipt (no duplicates) */
-function _buildReceiptWAMsg(c, userName, typeName, occasionName, displayRID) {
-  const genDate = new Date().toLocaleDateString("en-IN");
-  const payMode = c.PaymentMode || "—";
-  return (
-    `${APP.symbol} *${APP.name.toUpperCase()}*\n` +
-    `📍 ${APP.location}\n` +
-    `━━━━━━━━━━━━━━━━━━━━\n` +
-    `✅ *CONTRIBUTION RECEIPT*\n\n` +
-    `🔖 Receipt No: *${displayRID}*\n` +
-    `👤 Donor: *${userName}*\n` +
-    `💰 Amount: *${APP.currency} ${Number(c.Amount || 0).toLocaleString("en-IN")}*\n` +
-    `💳 Payment: ${payMode}\n` +
-    `📅 Month: ${c.ForMonth || "—"} ${c.Year || ""}\n` +
-    `🏷️ Type: ${typeName || "Contribution"}\n` +
-    (occasionName && occasionName !== "—" ? `🎉 Occasion: ${occasionName}\n` : "") +
-    (c.Note ? `📝 Note: ${c.Note}\n` : "") +
-    `📆 Date: ${formatPaymentDate(c.PaymentDate)}\n` +
-    `━━━━━━━━━━━━━━━━━━━━\n` +
-    `_🙏 ${APP.thankYouMsg}_\n` +
-    `_${APP.tagline} | System Generated — ${genDate}_`
-  );
-}
-
 /* ─────────────────────────────────────────────────────────────────────────── */
 
 function showReceipt(c, userName, typeName, occasionName, isAdmin){
@@ -1492,8 +1468,6 @@ function showReceipt(c, userName, typeName, occasionName, isAdmin){
   const payIcon    = payMode==="Cash" ? "money-bill-wave" : payMode==="Cheque" ? "file-invoice" : "mobile-screen-button";
   const shareButtons = isAdmin ? `
       <button class="_mbtn" style="background:#27ae60;" onclick="exportReceiptPDF('${rid}')"><i class="fa-solid fa-file-pdf"></i> PDF</button>
-      <button class="_mbtn" style="background:#25d366;" onclick="sendReceiptWhatsApp('${rid}')"><i class="fa-brands fa-whatsapp"></i> WhatsApp</button>
-      <button class="_mbtn" style="background:#128c7e;" onclick="exportReceiptPDFForWhatsApp('${rid}')"><i class="fa-brands fa-whatsapp"></i> WA+PDF</button>
       <button class="_mbtn" style="background:#2980b9;" onclick="sendReceiptEmailDirect('${rid}')"><i class="fa-solid fa-envelope"></i> Email</button>
       <button class="_mbtn" style="background:#7c3aed;" onclick="printReceipt('${rid}')"><i class="fa-solid fa-print"></i> Print</button>`
     : `<button class="_mbtn" style="background:#27ae60;" onclick="exportReceiptPDF('${rid}')"><i class="fa-solid fa-file-pdf"></i> Download PDF</button>`;
@@ -1569,34 +1543,6 @@ function showReceipt(c, userName, typeName, occasionName, isAdmin){
       ${shareButtons}
     </div>`;
   openModal(html,"540px");
-}
-
-function sendReceiptWhatsApp(rid){
-  const stored = window._rcptStore[rid];
-  if(!stored){toast("Receipt data not found.","error");return;}
-  const {c,userName,typeName,occasionName} = stored;
-  const dRID = _displayRID(c);
-  const msg  = _buildReceiptWAMsg(c, userName, typeName, occasionName, dRID);
-  window.open("https://wa.me/?text="+encodeURIComponent(msg),"_blank");
-}
-
-function exportReceiptPDFForWhatsApp(rid){
-  const stored = window._rcptStore[rid];
-  if(!stored){toast("Receipt data not found.","error");return;}
-  const {c,userName,typeName,occasionName} = stored;
-  const dRID = _displayRID(c);
-  const baseMsg = _buildReceiptWAMsg(c, userName, typeName, occasionName, dRID);
-  // Insert PDF-attach note before the last closing line
-  const lastLine = `_${APP.tagline}`;
-  const msg = baseMsg.replace(
-    lastLine,
-    `_PDF Receipt also downloaded — please attach it_\n${lastLine}`
-  );
-  exportReceiptPDF(rid);
-  setTimeout(()=>{
-    toast("📥 PDF downloaded — attach it in WhatsApp along with this message","");
-    window.open("https://wa.me/?text="+encodeURIComponent(msg),"_blank");
-  }, 600);
 }
 
 /* sendReceiptEmailDirect — calls server-side MailApp (real delivery, quota-guarded) */

@@ -668,7 +668,6 @@ var _ct_filtered   = [];   // filtered contribution rows (with pending injected)
       'loadContributionRequests','loadFeedbackAdmin','loadAuditLog','loadYearSummary',
       'refreshDashboardData',
       'fbMarkResolved','fbDeleteRow',
-      'replyToFeedback','_sendFeedbackReply',
       '_approveContribRequest','_rejectContribRequest','confirmRejectUser',
       'loadChatbotSettings',
       'downloadLocalBackup',
@@ -704,7 +703,6 @@ var _ct_filtered   = [];   // filtered contribution rows (with pending injected)
       clearAnnouncement: 'Clearing…', scheduleBroadcast: 'Scheduling…',
       addGoal:'Saving…', addOccasion:'Saving…', addType:'Saving…', addExpenseType:'Saving…',
       saveEditGoal:'Saving…', saveEventExpense:'Saving…',
-      replyToFeedback:'Sending…', _sendFeedbackReply:'Sending…',
       previewBroadcast:'Loading…', loadChatbotSettings:'Loading…',
       openReceiptAttach:'Loading…', _confirmCorrectionEntry:'Saving…'
     };

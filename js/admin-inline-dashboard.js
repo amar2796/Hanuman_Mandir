@@ -389,47 +389,6 @@ var dash_contributions = [];
       else                   _et_applyFilter();
     }
 
-    // ── WhatsApp — active tab data
-    function dash_whatsApp() {
-      const genDate = new Date().toLocaleDateString(APP.locale||"en-IN");
-      const fYear   = _dash_activeTab === "contrib"
-        ? (document.getElementById("ct_filterYear")?.value  || dash_selectedYear)
-        : (document.getElementById("et_filterYear")?.value  || dash_selectedYear);
-      const fMonth  = _dash_activeTab === "contrib"
-        ? (document.getElementById("ct_filterMonth")?.value || "")
-        : (document.getElementById("et_filterMonth")?.value || "");
-      const period  = fMonth ? `${_cap(fMonth)} ${fYear}` : String(fYear);
-
-      if (_dash_activeTab === "contrib") {
-        const paidRows = _ct_filtered.filter(r => r._type === "paid");
-        const totalC   = paidRows.reduce((s,r) => s + Number(r._data.Amount||0), 0);
-        const walkinC  = paidRows.filter(r => String(r._data.UserId).startsWith("WALKIN_"))
-                                 .reduce((s,r) => s + Number(r._data.Amount||0), 0);
-        const map = {}, noteMap = {};
-        paidRows.forEach(r => {
-          const uid = r._data.UserId;
-          map[uid] = (map[uid]||0) + Number(r._data.Amount||0);
-          if (!noteMap[uid]) noteMap[uid] = r._data.Note || "";
-        });
-        const lines = Object.keys(map).map(uid => {
-          const name  = dash_getDisplayName(uid, noteMap[uid]);
-          const label = String(uid).startsWith("WALKIN_") ? `${name} (Counter)` : name;
-          return `  ✅ ${label}: ${APP.currency||"₹"}${Number(map[uid]).toLocaleString(APP.locale||"en-IN")}`;
-        }).join("\n") || "  No contributions found";
-        const msg = `${APP.symbol||"🕉️"} *${APP.name.toUpperCase()}*\n📍 ${APP.location}\n\n📊 *Contribution Report — ${period}*\n━━━━━━━━━━━━━━━━━━━━\n💰 Total: ${APP.currency||"₹"}${Number(totalC).toLocaleString(APP.locale||"en-IN")}\n🚶 Donation Counter: ${APP.currency||"₹"}${Number(walkinC).toLocaleString(APP.locale||"en-IN")}\n━━━━━━━━━━━━━━━━━━━━\n${lines}\n━━━━━━━━━━━━━━━━━━━━\n_Generated — ${genDate}_`;
-        window.open("https://wa.me/?text=" + encodeURIComponent(msg), "_blank");
-      } else {
-        const rows  = _et_filtered;
-        const totalE = rows.reduce((s,e) => s + Number(e.Amount||0), 0);
-        const lines  = rows.map(e => {
-          const tName = dash_expenseTypes.find(x => String(x.ExpenseTypeId) === String(e.ExpenseTypeId))?.Name || "Expense";
-          return `  💸 ${escapeHtml(e.Title||"—")} (${tName}): ${APP.currency||"₹"}${Number(e.Amount||0).toLocaleString(APP.locale||"en-IN")}`;
-        }).join("\n") || "  No expenses found";
-        const msg = `${APP.symbol||"🕉️"} *${APP.name.toUpperCase()}*\n📍 ${APP.location}\n\n📋 *Expense Report — ${period}*\n━━━━━━━━━━━━━━━━━━━━\n💸 Total: ${APP.currency||"₹"}${Number(totalE).toLocaleString(APP.locale||"en-IN")}\n━━━━━━━━━━━━━━━━━━━━\n${lines}\n━━━━━━━━━━━━━━━━━━━━\n_Generated — ${genDate}_`;
-        window.open("https://wa.me/?text=" + encodeURIComponent(msg), "_blank");
-      }
-    }
-
     // ── Email — active tab data
     function dash_email() {
       const genDate = new Date().toLocaleDateString(APP.locale||"en-IN");

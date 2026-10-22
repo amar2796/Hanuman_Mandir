@@ -4,7 +4,6 @@
    Frontend-only additions for index.html:
      • Dark mode toggle + overrides
      • Quick-Pay floating action button
-     • WhatsApp share button (announcement banner)
      • FAQ accordion section
      • Emergency & Important Contacts section
    This file only ADDS new rules and scopes dark-mode overrides under
@@ -61,23 +60,6 @@
   .hf-pay-fab { right: 14px; bottom: 18px; padding: 12px 16px; font-size: 13px; }
 }
 
-/* ── WhatsApp share button inside announcement banner ───────────────── */
-.hf-ann-share {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  background: rgba(255,255,255,0.15);
-  color: #fff;
-  font-size: 13px;
-  margin-right: 6px;
-  cursor: pointer;
-  flex: 0 0 auto;
-  transition: background 0.2s ease;
-}
-.hf-ann-share:hover { background: rgba(255,255,255,0.28); }
 
 /* ── FAQ accordion section ───────────────────────────────────────────── */
 .hf-faq-section { padding: 64px 24px; text-align: center; }

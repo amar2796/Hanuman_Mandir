@@ -815,6 +815,7 @@ function _renderPagination(containerId, totalPages, currentPage, onPageFn) {
         ["Email",              escapeHtml(u.Email || "—")],
         ["Role",               '<span class="badge ' + roleClass + '">' + escapeHtml(u.Role || "User") + '</span>'],
         ["Status",             '<span class="badge ' + statClass + '">' + escapeHtml(u.Status || "Active") + '</span>'],
+        ...(String(u.Role || "").toLowerCase() === "admin" ? [["Access Level", '<span class="badge al-b al-b-' + (window._alKey ? window._alKey(u.AccessLevel) : "admin") + '">' + escapeHtml(window._alLabel ? window._alLabel(u.AccessLevel) : "Admin") + '</span>']] : []),
         // [FIX] These three existed on the user record (used in the Edit form)
         // but were never shown in the read-only Member Details view.
         ["Monthly Target",     (APP.currency||'₹') + ' ' + fmt(Number(u.MonthlyTarget || 0))],

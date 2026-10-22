@@ -232,8 +232,7 @@
             <td>${badge}</td>
             <td>
               <div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;">
-                ${!isDone ? `<button onclick="replyToFeedback(${rowIdx}, '${escapeHtml(name)}', '${escapeHtml(mobile)}')" style="background:#25d366;margin-right:4px;"><i class="fa-brands fa-whatsapp"></i> Reply</button>
-              <button class="btn-sm" onclick="fbMarkResolved(${rowIdx}, this)"
+                ${!isDone ? `<button class="btn-sm" onclick="fbMarkResolved(${rowIdx}, this)"
                   style="background:#d1fae5;color:#065f46;border:1px solid #6ee7b7;border-radius:8px;padding:4px 9px;font-size:11px;cursor:pointer;font-weight:600;display:inline-flex;align-items:center;gap:4px;white-space:nowrap;"><i class="fa-solid fa-check"></i> Done</button>` : ''}
                 <button onclick="fbDeleteRow(${rowIdx}, this)"
                   style="background:#fee2e2;color:#991b1b;border:1px solid #fca5a5;border-radius:8px;padding:4px 9px;font-size:11px;cursor:pointer;font-weight:600;display:inline-flex;align-items:center;gap:4px;white-space:nowrap;"><i class="fa-solid fa-trash-can"></i> Del</button>

@@ -107,7 +107,7 @@
          thankYouMsg: Shown on PDF receipt thank-you section and emails.
          footerNote : Printed at the bottom of system-generated PDFs.
          symbol     : Emoji / Unicode symbol for the religion or deity.
-                      Used in PDF receipt header and WhatsApp messages.
+                      Used in the PDF receipt header.
                       e.g. "🕉️" (Om), "✡️" (Star of David), "☪️" (Crescent)
          ✔ SYNC tagline and thankYouMsg with appscript CFG. */
       tagline:    "Jai Shree Ram",

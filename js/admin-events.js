@@ -130,10 +130,6 @@
           style="padding:7px 14px;font-size:12px;background:#7c3aed;box-shadow:none;">
           <i class="fa-solid fa-file-pdf"></i> Report
         </button>
-        <button onclick="shareEventWhatsApp('${ev.EventId}')"
-          style="padding:7px 14px;font-size:12px;background:#25d366;box-shadow:none;">
-          <i class="fa-brands fa-whatsapp"></i> Share
-        </button>
         <button onclick="openEditEvent('${ev.EventId}')"
           style="padding:7px 14px;font-size:12px;background:#64748b;box-shadow:none;">
           <i class="fa-solid fa-pen"></i> Edit
@@ -391,30 +387,6 @@
       </button>
     </div>`;
       openModal(html, "580px");
-    }
-
-    /* ── WhatsApp share ── */
-    function shareEventWhatsApp(eventId) {
-      const ev = _events.find(function (x) { return String(x.EventId) === String(eventId); });
-      if (!ev) return;
-      const evExps = _eventExpenses.filter(function (x) { return String(x.EventId) === String(eventId); });
-      const spent = evExps.reduce(function (s, x) { return s + Number(x.Amount || 0); }, 0);
-      const budget = Number(ev.Budget || 0);
-      const lines = evExps.map(function (x) { return `  • ${x.Title}: ${APP.currency||"₹"}${fmt(x.Amount)}`; }).join("\n") || "  No expenses yet";
-
-      const msg = `${APP.symbol||"🕉️"} *${ev.EventName}*\n` +
-        `📅 ${[ev.StartDate, ev.EndDate].filter(Boolean).join(" → ") || "Date TBD"}\n` +
-        `🏷️ ${ev.Category} · ${ev.Status}\n` +
-        `━━━━━━━━━━━━━━\n` +
-        (budget > 0 ? `💰 Budget: ${APP.currency||"₹"}${fmt(budget)}\n` : "") +
-        `💸 Spent: ${APP.currency||"₹"}${fmt(spent)}\n` +
-        (budget > 0 ? `📊 Remaining: ${APP.currency||"₹"}${fmt(budget - spent)}\n` : "") +
-        `━━━━━━━━━━━━━━\n` +
-        `*Expense Breakdown:*\n${lines}\n` +
-        `━━━━━━━━━━━━━━\n` +
-        `_${new Date().toLocaleDateString(APP.locale||"en-IN")} · ${APP.name}_`;
-
-      window.open("https://wa.me/?text=" + encodeURIComponent(msg), "_blank");
     }
 
     async function addGoal() {

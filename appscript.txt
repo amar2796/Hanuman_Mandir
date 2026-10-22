@@ -105,8 +105,10 @@ const SHEETS = {
 // client can tell a definitive "session is gone" (blank / mismatch / expired)
 // apart from a transient server hiccup ("error") and only retry the latter.
 var _VS_LAST_REASON = "";
+var _VS_CALLER_ID = "";   // UserId of the caller whose session was just verified (used by the access-level check)
 function _verifySession(params, actionName) {
   _VS_LAST_REASON = "";
+  _VS_CALLER_ID = "";
   const userId = sanitize(params.userId || params.UserId || params.AdminName || "", 30);
   const token  = sanitize(params.sessionToken || params.token || "", 64);
   if (!token || !userId) {
@@ -229,6 +231,7 @@ function _verifySession(params, actionName) {
             }
           }
         }
+        _VS_CALLER_ID = rowId;
         return true;
       }
     }
@@ -1969,7 +1972,7 @@ function _buildAdminSummaryPdfHtml(data) {
 }
 
 
-// ── Plain-text version, ready to select-all + copy-paste into WhatsApp/group chat.
+// ── Plain-text version, ready to select-all + copy-paste.
 //    Email HTML can't run a working "Copy" button in most clients (Gmail strips onclick),
 //    so a pre-formatted block the admin can manually select is the reliable fallback —
 //    it's also shown even when the PDF attaches fine, since forwarding text is often faster.
@@ -2979,7 +2982,7 @@ function _doGetCore(e) {
   // FIX SEC-1 (complete): Every action that modifies data OR exposes private data requires auth
   const _WRITE_ACTIONS = [
     // Contributions & Expenses
-    "addContribution","updateContribution","deleteContribution","setYearLock",
+    "addContribution","updateContribution","deleteContribution","setYearLock","setAccessLevel",
     "addExpense","updateExpense","deleteExpense",
     "removeExpenseReceipt","removeOneExpenseReceipt","removeAllExpenseReceipts",
     // Users
@@ -3027,6 +3030,17 @@ function _doGetCore(e) {
     return ContentService
       .createTextOutput(callback + "(" + JSON.stringify({status:"error",message:"Session expired. Please login again.",reason:_VS_LAST_REASON}) + ")")
       .setMimeType(ContentService.MimeType.JAVASCRIPT);
+  }
+
+  // ── ACCESS LEVEL (Super Admin / Admin / Viewer) — enforced for every restricted action
+  if (_ACTION_MIN[action]) {
+    const _denied = _accessCheck(action, e.parameter);
+    if (_denied) {
+      try { logAction(String(_VS_CALLER_ID || "Unknown"), "ACCESS_DENIED", "Action: " + action + " | " + (_denied.message || ""), "", "", { severity: "WARN", result: "BLOCKED" }); } catch (le) {}
+      return ContentService
+        .createTextOutput(callback + "(" + JSON.stringify(_denied) + ")")
+        .setMimeType(ContentService.MimeType.JAVASCRIPT);
+    }
   }
 
   // ── LOGIN
@@ -4145,6 +4159,8 @@ function _doGetCore(e) {
           _addContribStart,                                  // ContribStartDate — optional, admin-set
           ""                                                 // InactiveSince — blank, user starts Active
         ]);
+        // New Admin account: record its access level (Super Admin choice, default "Admin")
+        if (String(role).toLowerCase() === "admin") { try { _writeAccessLevel(newUserId, String(e.parameter.AccessLevel || "").trim() ? _normLevel(e.parameter.AccessLevel) : "viewer"); } catch (_alErr) {} }
         logAction(sanitize(e.parameter.AdminName||"Admin",100), "Add User", "UserId: " + newUserId + " | Mobile: " + mobile + " | Name: " + sanitize(e.parameter.Name||"",100) + " | Role: " + role);
 
         // Send welcome email — same style as approval email since admin is directly activating.
@@ -4705,6 +4721,10 @@ function _doGetCore(e) {
     if (result.status === "updated") logAction(sanitize(e.parameter.AdminName||"Admin",100), "Update Expense", "Id: " + e.parameter.Id + " | Title: " + (e.parameter.Title||"") + " | Amount: ₹" + (e.parameter.Amount||""));
   }
 
+  else if (action === "setAccessLevel") {
+    result = _setAccessLevel(_VS_CALLER_ID, sanitize(e.parameter.UserId, 30), sanitize(e.parameter.Level, 20));
+    if (result.status === "success") logAction(sanitize(e.parameter.AdminName || "Admin", 100), "Change Access Level", "UserId: " + result.userId + " | New level: " + result.level, "", "", { severity: "WARN", result: "SUCCESS" });
+  }
   else if (action === "setYearLock") {
     const _ly = parseInt(sanitize(e.parameter.Year, 10), 10);
     const _lv = String(e.parameter.Locked || "").toLowerCase() === "true";
@@ -4853,7 +4873,7 @@ function _doGetCore(e) {
 
       // ── Column integrity check per sheet ──
       var expectedCols = {
-        "USERS":                 ["UserId","Name","Mobile","Role","Password","Email","Status","SessionToken","Village","Address","RegisteredAt","PhotoURL","MonthlyTarget","LastLogin","DOB","TokenExpiry","ContribStartDate","InactiveSince","SessionTTL","ReactivatedAt"],
+        "USERS":                 ["UserId","Name","Mobile","Role","Password","Email","Status","SessionToken","Village","Address","RegisteredAt","PhotoURL","MonthlyTarget","LastLogin","DOB","TokenExpiry","ContribStartDate","InactiveSince","SessionTTL","ReactivatedAt","AccessLevel"],
         "CONTRIBUTION_REQUESTS": ["ReqId","UserId","Amount","PaymentMode","ForMonth","Year","Note","UtrRef","Status","RequestedAt","SlipURL","RejectionNote"],
         "BROADCAST":             ["BcId","Type","Priority","Title","Message","Time","AdminName","Status"],
         "CONTRIBUTIONS":         ["Id","UserId","Amount","PaymentDate","ForMonth","Year","TypeId","OccasionId","Note","ReceiptID","PaymentMode"],
@@ -5937,6 +5957,210 @@ function _setYearLock(year, locked) {
   bustSheetCache("YEAR_CONFIG");
 }
 
+// ════════════════════════════════════════════════════════════════
+//  ACCESS LEVELS (Admin accounts only) — USERS sheet, column "AccessLevel"
+//    Super Admin : everything
+//    Admin       : daily work (add / edit); no delete, no settings, no year lock,
+//                  no member approval, no bulk email blasts
+//    Viewer      : read-only
+//  Members (Role = User) are not affected: they never use admin actions.
+//  The rule is enforced HERE (server side); the web page only hides/greys.
+// ════════════════════════════════════════════════════════════════
+const _LEVEL_RANK = { viewer: 0, admin: 1, super: 2 };
+const _LEVEL_LABEL = { viewer: "Viewer", admin: "Admin", super: "Super Admin" };
+function _normLevel(v) {
+  const t = String(v == null ? "" : v).toLowerCase().replace(/[\s_\-]/g, "");
+  if (t === "superadmin" || t === "super") return "super";
+  if (t === "admin") return "admin";
+  return "viewer"; // blank / unknown = Viewer (least privilege — a Super Admin must raise it)
+}
+function _isAdminRole(u) { return String(u && u.Role || "").toLowerCase() === "admin"; }
+
+// Minimum level per action. "mixed" actions are also used by members for their own
+// records, so they are only restricted when the caller is an Admin account.
+const _ACTION_MIN = {
+  // — Admin and above (daily work) —
+  addContribution: "admin", updateContribution: "admin", addExpense: "admin", updateExpense: "admin",
+  addUser: "admin", uploadExpenseReceipt: "admin",   // Admin: add/edit contributions & expenses, add member (User) accounts
+  updateUser: "super", updateFeedbackStatus: "super",
+  resolveContributionRequest: "super", sendContribReceiptEmail: "super", sendIndividualTrackerEmail: "super",
+  // — Super Admin only —
+  deleteContribution: "super", deleteExpense: "super",
+  removeExpenseReceipt: "super", removeOneExpenseReceipt: "super", removeAllExpenseReceipts: "super",
+  setYearLock: "super", setAccessLevel: "super", resetTrafficStats: "super",
+  deleteUser: "super", restoreUser: "super", approveUser: "super", rejectUser: "super",
+  addType: "super", deleteType: "super", updateType: "super",
+  addOccasion: "super", deleteOccasion: "super", updateOccasion: "super",
+  addExpenseType: "super", deleteExpenseType: "super", updateExpenseType: "super", updateSortOrder: "super",
+  addGoal: "super", updateGoal: "super", deleteGoal: "super",
+  addEvent: "super", updateEvent: "super", deleteEvent: "super", addEventExpense: "super",
+  deleteGalleryPhoto: "super", uploadGalleryPhoto: "super",
+  saveEmailSettings: "super", saveAnnouncement: "super", clearAnnouncement: "super", toggleAnnouncementStatus: "super",
+  saveBroadcast: "super", deleteBroadcast: "super", toggleBroadcast: "super", saveChatbotConfig: "super",
+  deleteFeedback: "super", deleteContributionRequest: "super",
+  triggerMonthlyReport: "super", triggerMonthlyReminder: "super", sendMonthlyReminders: "super",
+  sendBirthdayEmails: "super", triggerAdminSummary: "super", triggerPendingReport: "super",
+  getAuditLog: "super", getBroadcastsAdmin: "super", getAnnouncementHistory: "super",
+  getEmailSettings: "super", getMonthlyReportStatus: "super", getAdminSummaryStatus: "super", getPendingReportStatus: "super"
+};
+const _ACTION_MIXED = { deleteContributionRequest: true };
+
+// One-time, automatic: add the AccessLevel column, make the OLDEST Admin account the
+// Super Admin when none exists, and give every other Admin the level "Admin".
+function _ensureAccessLevels() {
+  try {
+    const users = getSheetData(SHEETS.USERS);
+    const admins = users.filter(_isAdminRole);
+    if (!admins.length) return;
+    const hasCol = users.length > 0 && Object.prototype.hasOwnProperty.call(users[0], "AccessLevel");
+    const hasSuper = hasCol && admins.some(a => String(a.AccessLevel || "").trim() !== "" && _normLevel(a.AccessLevel) === "super");
+    const allSet = hasCol && admins.every(a => String(a.AccessLevel || "").trim() !== "");
+    if (hasSuper && allSet) return;
+    const lock = LockService.getScriptLock();
+    lock.waitLock(8000);
+    try {
+      bustSheetCache(SHEETS.USERS);
+      const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.USERS);
+      const vals = sheet.getDataRange().getValues();
+      const headers = vals[0].map(h => String(h).trim());
+      let col = headers.indexOf("AccessLevel");
+      if (col === -1) { col = headers.length; sheet.getRange(1, col + 1).setValue("AccessLevel"); }
+      const roleCol = headers.indexOf("Role");
+      let haveSuper = false, firstAdminRow = -1;
+      for (let i = 1; i < vals.length; i++) {
+        if (String(vals[i][roleCol] || "").toLowerCase() !== "admin") continue;
+        if (firstAdminRow === -1) firstAdminRow = i;
+        const cur = String(vals[i][col] === undefined ? "" : vals[i][col]).trim();
+        if (cur !== "" && _normLevel(cur) === "super") haveSuper = true;
+      }
+      for (let i = 1; i < vals.length; i++) {
+        if (String(vals[i][roleCol] || "").toLowerCase() !== "admin") continue;
+        const cur = String(vals[i][col] === undefined ? "" : vals[i][col]).trim();
+        if (i === firstAdminRow && !haveSuper) { sheet.getRange(i + 1, col + 1).setValue("Super Admin"); logAction("System", "ACCESS_LEVEL_AUTO_SUPER", "Oldest Admin row " + (i + 1) + " became Super Admin", "", "", { severity: "WARN", result: "SUCCESS" }); }
+        else if (cur === "") sheet.getRange(i + 1, col + 1).setValue(hasCol ? "Viewer" : "Admin"); // first-ever upgrade: existing admins keep working as Admin; any later blank = Viewer
+      }
+      SpreadsheetApp.flush();
+      bustSheetCache(SHEETS.USERS);
+      _bustSheetCache("c_users_verify");
+    } finally { lock.releaseLock(); }
+  } catch (err) { /* never block a request on the one-time upgrade; levels default to Admin */ }
+}
+
+// Returns null when allowed, or a ready error object when the caller's level is too low.
+function _accessCheck(action, params) {
+  const need = _ACTION_MIN[action];
+  if (!need) return null;
+  if (!_VS_CALLER_ID) return { status: "error", errorCode: "forbidden", message: "Session required." };
+  _ensureAccessLevels();
+  const users = getSheetData(SHEETS.USERS);
+  const me = users.find(u => String(u.UserId) === String(_VS_CALLER_ID));
+  if (!me) return { status: "error", errorCode: "forbidden", message: "Account not found." };
+  const isAdmin = _isAdminRole(me);
+  const myId = String(me.UserId);
+
+  // Members editing their OWN profile: allowed, but never their role/status.
+  if (action === "updateUser" && String(params.UserId || "") === myId) {
+    if (params.Role !== undefined && String(params.Role || "").toLowerCase() !== String(me.Role || "").toLowerCase())
+      return { status: "error", errorCode: "forbidden", message: "You cannot change your own role." };
+    if (params.Status !== undefined && String(params.Status || "").toLowerCase() !== String(me.Status || "Active").toLowerCase())
+      return { status: "error", errorCode: "forbidden", message: "You cannot change your own status." };
+    return null;
+  }
+  if (!isAdmin) {
+    if (_ACTION_MIXED[action]) return null; // member's own request handling stays as before
+    return { status: "error", errorCode: "forbidden", message: "Admin access required." };
+  }
+  const level = _normLevel(me.AccessLevel);
+  if (_LEVEL_RANK[level] < _LEVEL_RANK[need]) {
+    return {
+      status: "error", errorCode: "forbidden", requiredLevel: need, yourLevel: level,
+      message: level === "viewer"
+        ? "Your access level is View only. You cannot make changes."
+        : "This needs " + _LEVEL_LABEL[need] + " access. Your level is " + _LEVEL_LABEL[level] + "."
+    };
+  }
+  if (level !== "super") {
+    // Extra protection: an Admin may only manage MEMBERS, never other admins / roles / approvals.
+    if (action === "addUser" && String(params.Role || "User").toLowerCase() === "admin")
+      return { status: "error", errorCode: "forbidden", requiredLevel: "super", yourLevel: level, message: "Only a Super Admin can create an Admin account." };
+    if (action === "updateUser") {
+      const target = users.find(u => String(u.UserId) === String(params.UserId || ""));
+      if (target) {
+        if (_isAdminRole(target))
+          return { status: "error", errorCode: "forbidden", requiredLevel: "super", yourLevel: level, message: "Only a Super Admin can edit an Admin account." };
+        if (params.Role !== undefined && String(params.Role || "User").toLowerCase() !== String(target.Role || "User").toLowerCase())
+          return { status: "error", errorCode: "forbidden", requiredLevel: "super", yourLevel: level, message: "Only a Super Admin can change a member's role." };
+        const oldSt = String(target.Status || "Active").toLowerCase();
+        const newSt = String(params.Status || "Active").toLowerCase();
+        if ((oldSt === "pending" || oldSt === "rejected") && newSt !== oldSt)
+          return { status: "error", errorCode: "forbidden", requiredLevel: "super", yourLevel: level, message: "Only a Super Admin can approve or reject registrations." };
+        if (newSt !== "active" && newSt !== "inactive" && newSt !== oldSt)
+          return { status: "error", errorCode: "forbidden", requiredLevel: "super", yourLevel: level, message: "Only a Super Admin can set this status." };
+      }
+    }
+  }
+  return null;
+}
+
+// Writes AccessLevel for one user row (creates the column first if needed). No permission check — callers do that.
+function _writeAccessLevel(userId, lv) {
+  _ensureAccessLevels();
+  const lock = LockService.getScriptLock();
+  lock.waitLock(8000);
+  try {
+    bustSheetCache(SHEETS.USERS);
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.USERS);
+    const vals = sheet.getDataRange().getValues();
+    const headers = vals[0].map(h => String(h).trim());
+    let col = headers.indexOf("AccessLevel");
+    if (col === -1) { col = headers.length; sheet.getRange(1, col + 1).setValue("AccessLevel"); }
+    const idCol = headers.indexOf("UserId");
+    for (let i = 1; i < vals.length; i++) {
+      if (String(vals[i][idCol]) === String(userId)) {
+        sheet.getRange(i + 1, col + 1).setValue(_LEVEL_LABEL[lv]);
+        SpreadsheetApp.flush();
+        bustSheetCache(SHEETS.USERS);
+        _bustSheetCache("c_users_verify");
+        return true;
+      }
+    }
+  } finally { lock.releaseLock(); }
+  return false;
+}
+
+function _setAccessLevel(callerId, targetId, level) {
+  _ensureAccessLevels();
+  const lv = _normLevel(level);
+  const users = getSheetData(SHEETS.USERS);
+  const target = users.find(u => String(u.UserId) === String(targetId));
+  if (!target) return { status: "error", message: "User not found." };
+  if (!_isAdminRole(target)) return { status: "error", message: "Access levels apply to Admin accounts only." };
+  if (String(targetId) === String(callerId)) return { status: "error", message: "You cannot change your own access level." };
+  const supers = users.filter(u => _isAdminRole(u) && String(u.AccessLevel || "").trim() !== "" && _normLevel(u.AccessLevel) === "super");
+  if (_normLevel(target.AccessLevel) === "super" && lv !== "super" && supers.length <= 1)
+    return { status: "error", message: "There must always be at least one Super Admin." };
+  const lock = LockService.getScriptLock();
+  lock.waitLock(8000);
+  try {
+    bustSheetCache(SHEETS.USERS);
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.USERS);
+    const vals = sheet.getDataRange().getValues();
+    const headers = vals[0].map(h => String(h).trim());
+    const col = headers.indexOf("AccessLevel"), idCol = headers.indexOf("UserId");
+    if (col === -1) return { status: "error", message: "AccessLevel column missing." };
+    for (let i = 1; i < vals.length; i++) {
+      if (String(vals[i][idCol]) === String(targetId)) {
+        sheet.getRange(i + 1, col + 1).setValue(_LEVEL_LABEL[lv]);
+        SpreadsheetApp.flush();
+        bustSheetCache(SHEETS.USERS);
+        _bustSheetCache("c_users_verify");
+        return { status: "success", userId: targetId, level: _LEVEL_LABEL[lv] };
+      }
+    }
+    return { status: "error", message: "User not found." };
+  } finally { lock.releaseLock(); }
+}
+
 function addRow(name, row) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(name);
   sheet.appendRow(row);
@@ -6601,6 +6825,9 @@ function doPost(e) {
         .setMimeType(ContentService.MimeType.JSON);
     }
 
+    { const _denied = _accessCheck(String(data.action || ""), data);
+      if (_denied) return ContentService.createTextOutput(JSON.stringify(_denied)).setMimeType(ContentService.MimeType.JSON); }
+
     if (data.action === "uploadAndSaveProfile") {
       if (!data.base64 || !data.fileName) return ContentService.createTextOutput(JSON.stringify({status:"error",message:"Missing data."})).setMimeType(ContentService.MimeType.JSON);
       // [SEC] Authorization: a caller may only change their OWN profile photo,
@@ -7210,7 +7437,6 @@ function _defaultChatbotConfig() {
     upi_id:          "",
     contact_phone:   "",
     contact_email:   "",
-    contact_whatsapp:"",
     custom_q1_en:    "",
     custom_q1_hi:    "",
     custom_a1_en:    "",
@@ -7238,7 +7464,7 @@ function saveChatbotConfig(params) {
       "enabled","welcome_en","welcome_hi","timings_en","timings_hi",
       "location_en","location_hi","donate_en","donate_hi",
       "bank_name","bank_account","bank_ifsc","bank_branch",
-      "upi_id","contact_phone","contact_email","contact_whatsapp",
+      "upi_id","contact_phone","contact_email",
       "custom_q1_en","custom_q1_hi","custom_a1_en","custom_a1_hi",
       "custom_q2_en","custom_q2_hi","custom_a2_en","custom_a2_hi"
     ];
@@ -8709,7 +8935,7 @@ function _fbSessionRegister(p) {
 }
 
 // ── automatic Firestore copy: any write action marks "dirty"; a 1-minute tick copies changes ──
-var _FS_DIRTY_RE = /^(add|update|delete|approve|reject|restore|reset|change|resolve|register|verify|submit|edit|save)/i;
+var _FS_DIRTY_RE = /^(add|update|delete|approve|reject|restore|reset|change|resolve|register|verify|submit|edit|save|setYearLock|setAccessLevel)/i;   // setYearLock / setAccessLevel must reach Firestore too
 function _fsMarkDirty(e, out) {
   var a = e && e.parameter && e.parameter.action;
   if (a && _FS_DIRTY_RE.test(a)) CacheService.getScriptCache().put("fs_dirty", "1", 21600);

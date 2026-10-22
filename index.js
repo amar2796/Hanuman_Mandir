@@ -437,7 +437,7 @@ var _trLoaded = false;
         setTimeout(function(){ banner.classList.remove("open"); banner.style = ""; _syncSiteTopHeight(); }, 360);
         try { sessionStorage.setItem("ann_dismissed", _annDismissedId || "1"); } catch(e){}
       }
-      /* ── Visit the Mandir: address / call / WhatsApp / email / directions / timings ──
+      /* ── Visit the Mandir: address / call / email / directions / timings ──
          Everything comes from APP in constants.js. A card whose data is missing is
          hidden, so nothing empty or made-up is ever shown. All text is set with
          textContent (never innerHTML). */
@@ -475,15 +475,14 @@ var _trLoaded = false;
           $("visitDirections").href = dir;
         } else { hide("visitAddressCard"); }
 
-        // Phone + WhatsApp
+        // Phone
         var raw = String(APP.phone || "").trim();
         var digits = raw.replace(/\D/g, "");
         if (digits.length >= 8) {
           var pretty = raw.replace(/^\+91\s?(\d{5})(\d{5})$/, "+91 $1 $2");
           $("visitPhone").textContent = pretty;
           $("visitCallBtn").href = "tel:" + (raw.charAt(0) === "+" ? "+" : "") + digits;
-          $("visitWhatsappBtn").href = "https://wa.me/" + digits + "?text=" + encodeURIComponent((APP.tagline || "Namaste") + " 🙏");
-        } else { hide("visitCallCard"); hide("visitWhatsappCard"); }
+        } else { hide("visitCallCard"); }
 
         // Email
         var mail = String(APP.email || "").trim();

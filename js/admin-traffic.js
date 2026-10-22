@@ -313,41 +313,6 @@
     }
     document.addEventListener("DOMContentLoaded", _initChatbotQALimits);
 
-    // ── M11: Reply to feedback member
-    function replyToFeedback(rowIndex, memberName, memberMobile) {
-      const s = JSON.parse(localStorage.getItem("session") || "{}");
-      const html = `
-          <div class="_mhdr"><h3><i class="fa-solid fa-reply"></i> Reply to ${escapeHtml(memberName || "Member")}</h3><button class="_mcls" onclick="closeModal()">×</button></div>
-          <div class="_mbdy">
-            <p style="font-size:12px;color:#64748b;margin-bottom:12px;">This will send a WhatsApp message to <strong>${escapeHtml(memberName)}</strong> (${escapeHtml(memberMobile || "")}).</p>
-            <label style="font-size:12px;font-weight:600;display:block;margin-bottom:6px;">Your Reply</label>
-            <textarea id="fbReplyMsg" placeholder="Type your response..." style="width:100%;min-height:100px;padding:10px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;font-family:inherit;resize:vertical;outline:none;box-sizing:border-box;"></textarea>
-          </div>
-          <div class="_mft">
-            <button class="_mbtn" style="background:#999;" onclick="closeModal()">Cancel</button>
-            <button class="_mbtn" style="background:#25d366;" onclick="_sendFeedbackReply('${rowIndex}','${encodeURIComponent(memberMobile || "")}')">
-              <i class="fa-brands fa-whatsapp"></i> Send via WhatsApp
-            </button>
-          </div>`;
-      openModal(html, "460px");
-    }
-
-    function _sendFeedbackReply(rowIndex, encodedMobile) {
-      const msg = (document.getElementById("fbReplyMsg") || {}).value || "";
-      if (!msg.trim()) { toast("Please type a reply message.", "warn"); return; }
-      const mobile = decodeURIComponent(encodedMobile).replace(/\D/g, "");
-      if (!mobile || mobile.length < 10) { toast("No valid mobile number for this member.", "warn"); return; }
-      const s = JSON.parse(localStorage.getItem("session") || "{}");
-      const waText = encodeURIComponent(APP.name + " — Admin Reply:\n\n" + msg + "\n\n— " + (s.name || "Mandir Admin"));
-      window.open("https://wa.me/91" + mobile + "?text=" + waText, "_blank");
-      // Mark as replied
-      postData({
-        action: "updateFeedbackStatus", RowIndex: rowIndex, Status: "Replied",
-        sessionToken: s.sessionToken || "", userId: s.userId || ""
-      })
-        .then(() => { closeModal(); toast("Marked as Replied."); if (typeof loadFeedback === "function") loadFeedback(); })
-        .catch(() => closeModal());
-    }
 
     // ── L5: Gallery tag filter
     function filterGalleryByTag(tag) {
