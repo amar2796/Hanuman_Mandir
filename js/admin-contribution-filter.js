@@ -107,14 +107,23 @@ var _ct_filtered   = [];   // filtered contribution rows (with pending injected)
       var combined = [...paidRows, ...pendingRows];
 
       /* Sort */
+      // Newest first must also order entries made on the same day: tie-break by the
+      // time of day, then by position in the sheet (later row = newer entry).
+      const _ctOrder = new Map((Array.isArray(data) ? data : []).map((r, i) => [r, i]));
+      const _ctTie = (x, y, dir) => {
+        if (x._type !== "paid" || y._type !== "paid") return 0;
+        const tx = _dash_parseDateTimeSort(x._data.PaymentDate), ty = _dash_parseDateTimeSort(y._data.PaymentDate);
+        const c = tx.localeCompare(ty) || ((_ctOrder.get(x._data) || 0) - (_ctOrder.get(y._data) || 0));
+        return dir * c;
+      };
       combined.sort((a, b) => {
         const getDate = r => r._type === "paid" ? _dash_parseDateSort(r._data.PaymentDate) : "0";
         const getAmt  = r => r._type === "paid" ? Number(r._data.Amount || 0) : 0;
         const getName = r => r._type === "paid"
           ? dash_getDisplayName(r._data.UserId, r._data.Note).toLowerCase()
           : (r._data.Name || "").toLowerCase();
-        if (_ct_sortBy === "date_desc") return getDate(b).localeCompare(getDate(a));
-        if (_ct_sortBy === "date_asc")  return getDate(a).localeCompare(getDate(b));
+        if (_ct_sortBy === "date_desc") return getDate(b).localeCompare(getDate(a)) || _ctTie(a, b, -1);
+        if (_ct_sortBy === "date_asc")  return getDate(a).localeCompare(getDate(b)) || _ctTie(a, b, 1);
         if (_ct_sortBy === "amount_desc") return getAmt(b) - getAmt(a);
         if (_ct_sortBy === "amount_asc")  return getAmt(a) - getAmt(b);
         if (_ct_sortBy === "name_asc")    return getName(a).localeCompare(getName(b));
@@ -649,7 +658,7 @@ var _ct_filtered   = [];   // filtered contribution rows (with pending injected)
       // they call confirmModal() which has its own "Processing…" spinner on the confirm button.
       // Adding _wrapFn spinner on the trash button too causes a double-spinner (see bug fix).
       'uploadGalleryPhoto','uploadExpenseReceipt','openReceiptAttach',
-      'exportContribCSV','exportExpenseCSV','exportAuditCSV','exportAnnualReportPDF',
+      'exportContribCSV','exportExpenseCSV','exportUsersCSV','exportAuditCSV','exportAnnualReportPDF',
       'dash_exportPDF',
       'sendBroadcast','scheduleBroadcast','previewBroadcast',
       'sendTrackerMsg',
@@ -677,7 +686,7 @@ var _ct_filtered   = [];   // filtered contribution rows (with pending injected)
       saveAdminNewPassword: 'Updating…',
       deleteGalleryPhoto: 'Deleting…',
       uploadGalleryPhoto: 'Uploading…', uploadExpenseReceipt: 'Uploading…',
-      exportContribCSV: 'Exporting…', exportExpenseCSV: 'Exporting…',
+      exportContribCSV: 'Exporting…', exportExpenseCSV: 'Exporting…', exportUsersCSV: 'Exporting…',
       exportAuditCSV: 'Exporting…', exportAnnualReportPDF: 'Generating PDF…',
       dash_exportPDF: 'Generating PDF…',
       sendBroadcast: 'Sending…', sendTrackerMsg: 'Sending…',

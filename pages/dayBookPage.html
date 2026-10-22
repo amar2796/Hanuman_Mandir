@@ -1,0 +1,93 @@
+      <!-- DAY BOOK -->
+      <div id="dayBookPage" class="page">
+
+        <div class="sp-action-bar">
+          <div class="sp-action-bar-title">
+            <i class="fa-solid fa-book"></i> Day Book
+          </div>
+          <div class="sp-action-btns">
+            <button class="sp-action-btn sp-btn-dark" onclick="dbExportCSV()" title="Download the entries below as CSV (opens in Excel)">
+              <i class="fa-solid fa-file-csv"></i> Export CSV
+            </button>
+            <button class="sp-action-btn sp-btn-red" onclick="dbExportPDF()" title="Download the entries below as PDF">
+              <i class="fa-solid fa-file-pdf"></i> Export PDF
+            </button>
+          </div>
+        </div>
+
+        <!-- Filters -->
+        <div class="card-v2">
+          <div class="db-quick" id="db_quick">
+            <button type="button" class="db-chip" data-q="today"     onclick="dbQuick('today',this)">Today</button>
+            <button type="button" class="db-chip" data-q="week"      onclick="dbQuick('week',this)">This week</button>
+            <button type="button" class="db-chip active" data-q="month" onclick="dbQuick('month',this)">This month</button>
+            <button type="button" class="db-chip" data-q="lastmonth" onclick="dbQuick('lastmonth',this)">Last month</button>
+            <button type="button" class="db-chip" data-q="year"      onclick="dbQuick('year',this)">This year</button>
+            <button type="button" class="db-chip" data-q="all"       onclick="dbQuick('all',this)">All time</button>
+          </div>
+          <div class="db-filters">
+            <label>From <input type="date" id="db_from" onchange="dbCustomDate()"></label>
+            <label>To <input type="date" id="db_to" onchange="dbCustomDate()"></label>
+            <label>Show
+              <select id="db_kind" onchange="dbRender(true)">
+                <option value="all">Receipts &amp; Expenses</option>
+                <option value="in">Receipts only</option>
+                <option value="out">Expenses only</option>
+              </select>
+            </label>
+            <label>Group by
+              <select id="db_basis" onchange="dbRender(true)" title="Period = the entry's Month and Year. Entry date = the day it was typed in.">
+                <option value="period">Period (Month/Year)</option>
+                <option value="entry">Entry date</option>
+              </select>
+            </label>
+            <label>Order
+              <select id="db_order" onchange="dbRender(true)">
+                <option value="desc">Newest first</option>
+                <option value="asc">Oldest first</option>
+              </select>
+            </label>
+            <input class="search-bar db-search" id="db_search" placeholder="🔍 Search name, receipt no, title…" oninput="dbSearchDebounced()">
+          </div>
+        </div>
+
+        <!-- Summary -->
+        <div class="db-cards" id="db_cards">
+          <div class="card-box"><h4>Opening Balance</h4><h2 id="db_open">—</h2></div>
+          <div class="card-box"><h4>Total Receipts</h4><h2 id="db_in" style="color:#27ae60;">—</h2><small id="db_in_n"></small></div>
+          <div class="card-box"><h4>Total Expenses</h4><h2 id="db_out" style="color:#e74c3c;">—</h2><small id="db_out_n"></small></div>
+          <div class="card-box"><h4>Closing Balance</h4><h2 id="db_close" style="color:#C1440E;">—</h2></div>
+        </div>
+
+        <!-- Ledger -->
+        <div class="card-v2">
+          <h3 style="margin-bottom:12px;"><i class="fa-solid fa-list-ol"></i> Entries <span id="db_period" style="font-size:12px;font-weight:400;color:#94a3b8;"></span></h3>
+          <div class="table-v2-wrap">
+            <div class="table-v2-scroll">
+              <table class="table-v2 db-table">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Particulars</th>
+                    <th>Ref</th>
+                    <th>Type</th>
+                    <th>Mode</th>
+                    <th class="db-num">Receipt (In)</th>
+                    <th class="db-num">Expense (Out)</th>
+                    <th class="db-num">Balance</th>
+                  </tr>
+                </thead>
+                <tbody id="db_body"></tbody>
+              </table>
+            </div>
+          </div>
+          <div id="db_pagination" class="pagination-bar"></div>
+          <p class="db-note">
+            Entries are placed by their <b>Month/Year</b> (Group by: Period) or by the <b>day they were entered</b> (Group by: Entry date). Opening balance = the year's opening balance
+            (Year Summary settings) plus that year's earlier entries. Event expenses are tracked on the
+            Events page and are not included here, same as the Year Summary.
+          </p>
+        </div>
+
+      </div>
+      <!-- END DAY BOOK PAGE -->

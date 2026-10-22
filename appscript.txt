@@ -2953,7 +2953,7 @@ function _emailRow(label, value) {
 // ════════════════════════════════════════════════════════════════
 //  MAIN GET HANDLER
 // ════════════════════════════════════════════════════════════════
-function doGet(e) {
+function _doGetCore(e) {
   const action   = sanitize(e.parameter.action, 50);
   // FIX SEC-3: Whitelist callback to alphanumeric+underscore only — prevents JSONP injection
   const _rawCb   = String(e.parameter.callback || "cb");
@@ -2979,7 +2979,7 @@ function doGet(e) {
   // FIX SEC-1 (complete): Every action that modifies data OR exposes private data requires auth
   const _WRITE_ACTIONS = [
     // Contributions & Expenses
-    "addContribution","updateContribution","deleteContribution",
+    "addContribution","updateContribution","deleteContribution","setYearLock",
     "addExpense","updateExpense","deleteExpense",
     "removeExpenseReceipt","removeOneExpenseReceipt","removeAllExpenseReceipts",
     // Users
@@ -4483,6 +4483,7 @@ function doGet(e) {
   //  Receipt ID: MNR-2025-00001 (year-wise, uses selected Year)
   // ════════════════════════════════════════════════════════════════
   else if (action === "addContribution") {
+    { const _lk = _yearLockResponse(callback, [sanitize(e.parameter.Year, 10)]); if (_lk) return _lk; }
     // ── [GUARANTEE] Idempotency check — see _idempotencyCheckAndReserve() above.
     // If this exact request (same IdempotencyKey) already ran, replay its
     // result instead of inserting a second row.
@@ -4629,6 +4630,7 @@ function doGet(e) {
 
   // ── ADD EXPENSE — [ID] EXP-2025-00001 (year-wise reset)
   else if (action === "addExpense") {
+    { const _lk = _yearLockResponse(callback, [sanitize(e.parameter.Year, 10)]); if (_lk) return _lk; }
     // ── [GUARANTEE] Idempotency check — same guard addContribution uses above.
     // If this exact request (same IdempotencyKey) already ran, replay its
     // result instead of inserting a second expense row.
@@ -4672,6 +4674,8 @@ function doGet(e) {
 
   else if (action === "deleteContribution") {
     let id    = sanitize(e.parameter.Id, 30);
+    { const _row = getSheetData(SHEETS.CONTRIBUTIONS).find(r => String(r.Id) === id);
+      const _lk = _yearLockResponse(callback, [_row && _row.Year]); if (_lk) return _lk; }
     let admin = sanitize(e.parameter.AdminName || "Admin", 100);
     const _dc = getSheetData(SHEETS.CONTRIBUTIONS).find(r => String(r.Id) === id);
     result = deleteRow(SHEETS.CONTRIBUTIONS, id);
@@ -4679,18 +4683,40 @@ function doGet(e) {
   }
   else if (action === "deleteExpense") {
     let id    = sanitize(e.parameter.Id, 30);
+    { const _row = getSheetData(SHEETS.EXPENSES).find(r => String(r.Id) === id);
+      const _lk = _yearLockResponse(callback, [_row && _row.Year]); if (_lk) return _lk; }
     let admin = sanitize(e.parameter.AdminName || "Admin", 100);
     const _de = getSheetData(SHEETS.EXPENSES).find(r => String(r.Id) === id);
     result = deleteRow(SHEETS.EXPENSES, id);
     if (result.status === "deleted") logAction(admin, "Delete Expense", "Id: " + id + (_de ? " | Title: " + (_de.Title||"") + " | Amount: ₹" + (_de.Amount||0) + " | Month: " + (_de.ForMonth||"") + " " + (_de.Year||"") : ""), "", "", { severity:"WARN", result:"SUCCESS" });
   }
   else if (action === "updateContribution") {
+    { const _id = sanitize(e.parameter.Id, 30);
+      const _row = getSheetData(SHEETS.CONTRIBUTIONS).find(r => String(r.Id) === _id);
+      const _lk = _yearLockResponse(callback, [_row && _row.Year, sanitize(e.parameter.Year, 10)]); if (_lk) return _lk; }
     result = updateRow(SHEETS.CONTRIBUTIONS, e.parameter);
     if (result.status === "updated") logAction(sanitize(e.parameter.AdminName||"Admin",100), "Update Contribution", "Id: " + e.parameter.Id + " | Amount: ₹" + (e.parameter.Amount||"") + " | Month: " + (e.parameter.ForMonth||"") + " " + (e.parameter.Year||""));
   }
   else if (action === "updateExpense") {
+    { const _id = sanitize(e.parameter.Id, 30);
+      const _row = getSheetData(SHEETS.EXPENSES).find(r => String(r.Id) === _id);
+      const _lk = _yearLockResponse(callback, [_row && _row.Year, sanitize(e.parameter.Year, 10)]); if (_lk) return _lk; }
     result = updateExpenseRow(SHEETS.EXPENSES, e.parameter);
     if (result.status === "updated") logAction(sanitize(e.parameter.AdminName||"Admin",100), "Update Expense", "Id: " + e.parameter.Id + " | Title: " + (e.parameter.Title||"") + " | Amount: ₹" + (e.parameter.Amount||""));
+  }
+
+  else if (action === "setYearLock") {
+    const _ly = parseInt(sanitize(e.parameter.Year, 10), 10);
+    const _lv = String(e.parameter.Locked || "").toLowerCase() === "true";
+    if (isNaN(_ly) || _ly < 2000 || _ly > 2100) {
+      result = { status: "error", message: "Invalid year." };
+    } else {
+      const _lock = LockService.getScriptLock();
+      _lock.waitLock(8000);
+      try { _setYearLock(_ly, _lv); } finally { _lock.releaseLock(); }
+      logAction(sanitize(e.parameter.AdminName || "Admin", 100), _lv ? "Lock Year" : "Unlock Year", "Year: " + _ly, "", "", { severity: "WARN", result: "SUCCESS" });
+      result = { status: "success", year: _ly, locked: _lv };
+    }
   }
 
   // ── ANNOUNCEMENTS & BROADCASTS (unchanged from original)
@@ -4844,7 +4870,7 @@ function doGet(e) {
         "CHATBOT_CONFIG":        ["Key","Value","UpdatedAt"],
         "AUDIT_LOGS":            ["Timestamp","Actor","Action","Result","Details","Reason","Error","DeviceInfo","Severity"],
         "ANNOUNCEMENT":          ["AnnId","Message","Badge","Icon","Color","Status","AdminName","CreatedAt"],
-        "YEAR_CONFIG":           ["Year","OpeningBalance"]
+        "YEAR_CONFIG":           ["Year","OpeningBalance","Locked"]
       };
 
       Object.keys(expectedCols).forEach(function(name) {
@@ -5170,6 +5196,11 @@ function doGet(e) {
             const currentStatus = String(data2[i][statusCol] || "Pending");
             if (currentStatus !== "Pending") {
               result = { status: "already_resolved", message: "This request was already resolved by another admin." };
+              break;
+            }
+            if (status === "Approved" && _isYearLocked(data2[i][hdrs.indexOf("Year")])) {
+              const _ly2 = parseInt(data2[i][hdrs.indexOf("Year")], 10);
+              result = { status: "error", errorCode: "year_locked", year: _ly2, message: "Year " + _ly2 + " is locked. This request cannot be approved until the year is unlocked in Year Summary." };
               break;
             }
             sheet.getRange(i+1, statusCol+1).setValue(status);
@@ -5847,6 +5878,63 @@ function updateUser(p) {
   }
   if (found) { logAction(sanitize(p.AdminName,100)||"System","Update User","UserId: "+userId+" | Name: "+sanitize(p.Name||"",100)+" | Role: "+sanitize(p.Role||"",20)+" | Status: "+sanitize(p.Status||"",20),"Profile updated"); return {status:"updated"}; }
   return { status: "not found" };
+}
+
+// ════════════════════════════════════════════════════════════════
+//  YEAR LOCK — YEAR_CONFIG sheet, column "Locked" (TRUE/FALSE)
+//  A locked year accepts no add / edit / delete of contributions or
+//  expenses. The year is the entry's Year field (NOT PaymentDate, which is
+//  only the day the row was typed in). Opening balance is unaffected.
+// ════════════════════════════════════════════════════════════════
+function _lockedYearSet() {
+  const set = {};
+  getSheetData("YEAR_CONFIG").forEach(function(r) {
+    const y = parseInt(r.Year || r.year, 10);
+    const v = String(r.Locked === undefined ? "" : r.Locked).trim().toLowerCase();
+    if (!isNaN(y) && (v === "true" || v === "yes" || v === "1" || v === "locked")) set[y] = true;
+  });
+  return set;
+}
+function _isYearLocked(year) {
+  const y = parseInt(year, 10);
+  return !isNaN(y) && _lockedYearSet()[y] === true;
+}
+// Returns a ready JSONP error response when ANY of the given years is locked, else null.
+function _yearLockResponse(callback, years) {
+  const list = (years || []).filter(function(y){ return y !== undefined && y !== null && String(y) !== ""; });
+  for (let i = 0; i < list.length; i++) {
+    if (_isYearLocked(list[i])) {
+      const y = parseInt(list[i], 10);
+      return ContentService
+        .createTextOutput(callback + "(" + JSON.stringify({
+          status: "error", errorCode: "year_locked", year: y,
+          message: "Year " + y + " is locked. Entries for " + y + " cannot be added, edited or deleted. Unlock the year in Year Summary first."
+        }) + ")")
+        .setMimeType(ContentService.MimeType.JAVASCRIPT);
+    }
+  }
+  return null;
+}
+function _setYearLock(year, locked) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName("YEAR_CONFIG");
+  if (!sheet) { sheet = ss.insertSheet("YEAR_CONFIG"); sheet.appendRow(["Year", "OpeningBalance", "Locked"]); }
+  let lastCol = Math.max(sheet.getLastColumn(), 1);
+  let headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0].map(function(h){ return String(h).trim(); });
+  let lockCol = headers.indexOf("Locked");
+  if (lockCol === -1) { lockCol = headers.length; sheet.getRange(1, lockCol + 1).setValue("Locked"); headers.push("Locked"); }
+  const yearCol = headers.indexOf("Year");
+  const vals = sheet.getDataRange().getValues();
+  let row = -1;
+  for (let i = 1; i < vals.length; i++) { if (parseInt(vals[i][yearCol], 10) === year) { row = i + 1; break; } }
+  if (row === -1) {
+    const nr = headers.map(function(){ return ""; });
+    nr[yearCol] = year; nr[lockCol] = locked ? "TRUE" : "FALSE";
+    sheet.appendRow(nr);
+  } else {
+    sheet.getRange(row, lockCol + 1).setValue(locked ? "TRUE" : "FALSE");
+  }
+  bustSheetCache("YEAR_CONFIG");
 }
 
 function addRow(name, row) {
@@ -8241,3 +8329,551 @@ function removeKeepWarmTrigger() {
     if (t.getHandlerFunction() === "keepWarm") ScriptApp.deleteTrigger(t);
   });
 }
+
+
+// ════════════════════════════════════════════════════════════════
+//  FIREBASE (1/8): admin connection - lets Apps Script talk to Firebase Authentication
+// ════════════════════════════════════════════════════════════════
+var FB_PROJECT_ID = "testing-88cf2";
+
+function _fbB64u(x) { return Utilities.base64EncodeWebSafe(x).replace(/=+$/, ""); }
+
+// Short-lived access token from the service-account key (cached ~50 min).
+function _fbAdminToken() {
+  var cache = CacheService.getScriptCache();
+  var cached = cache.get("fb_admin_token");
+  if (cached) return cached;
+  var raw = PropertiesService.getScriptProperties().getProperty("FB_SERVICE_ACCOUNT");
+  if (!raw) throw new Error("Script property FB_SERVICE_ACCOUNT is missing");
+  var sa = JSON.parse(raw);
+  var now = Math.floor(Date.now() / 1000);
+  var unsigned = _fbB64u(JSON.stringify({ alg: "RS256", typ: "JWT" })) + "." +
+    _fbB64u(JSON.stringify({
+      iss: sa.client_email,
+      scope: "https://www.googleapis.com/auth/cloud-platform",
+      aud: "https://oauth2.googleapis.com/token",
+      iat: now, exp: now + 3600
+    }));
+  var jwt = unsigned + "." + _fbB64u(Utilities.computeRsaSha256Signature(unsigned, sa.private_key));
+  var res = UrlFetchApp.fetch("https://oauth2.googleapis.com/token", {
+    method: "post",
+    payload: { grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer", assertion: jwt },
+    muteHttpExceptions: true
+  });
+  var body = {};
+  try { body = JSON.parse(res.getContentText()); } catch (e) {}
+  if (!body.access_token) throw new Error("Firebase token error: " + (body.error_description || body.error || res.getResponseCode()));
+  cache.put("fb_admin_token", body.access_token, Math.min(3000, (body.expires_in || 3600) - 300));
+  return body.access_token;
+}
+
+// Generic admin call, e.g. _fbAdmin("accounts:lookup", { localId: ["USER-00002"] })
+function _fbAdmin(path, payload) {
+  var res = UrlFetchApp.fetch("https://identitytoolkit.googleapis.com/v1/projects/" + FB_PROJECT_ID + "/" + path, {
+    method: "post",
+    contentType: "application/json",
+    headers: { Authorization: "Bearer " + _fbAdminToken() },
+    payload: JSON.stringify(payload || {}),
+    muteHttpExceptions: true
+  });
+  var code = res.getResponseCode(), body = {};
+  try { body = JSON.parse(res.getContentText()); } catch (e) {}
+  if (code >= 300) throw new Error("Firebase " + path + " failed (" + code + "): " + ((body.error && body.error.message) || String(res.getContentText()).slice(0, 200)));
+  return body;
+}
+
+// Run this once from the editor. It only READS one user; it changes nothing.
+function testFirebaseAdmin() {
+  var u = getSheetData(SHEETS.USERS)[0];
+  var r = _fbAdmin("accounts:lookup", { localId: [String(u.UserId)] });
+  var f = (r.users || [])[0];
+  Logger.log(f
+    ? "OK: " + f.localId + " | " + f.email + " | disabled=" + !!f.disabled + " | claims=" + (f.customAttributes || "none")
+    : "Connected, but user " + u.UserId + " was not found in Firebase");
+}
+
+
+// ════════════════════════════════════════════════════════════════
+//  FIREBASE (2/8): keeps Firebase logins in step with the USERS sheet + the doGet entry point
+// ════════════════════════════════════════════════════════════════
+function doGet(e) {
+  var early = _fsEarly(e);                       // the new action "firebaseSession" is answered here
+  if (early) return early;
+  var out = _doGetCore(e);                       // your original code, unchanged
+  try { _fsMarkDirty(e, out); } catch (err) {}   // something was saved: copy it to Firestore within about 1 minute
+  try { _fbAfterAction(e, out); } catch (err) { /* Firebase must never break the app */ }
+  return out;
+}
+
+var _FB_SYNC_ACTIONS = { addUser: 1, approveUser: 1, updateUser: 1, changePassword: 1,
+                         resetPassword: 1, deleteUser: 1, restoreUser: 1, verifyMobileChangeOTP: 1 };
+
+function _fbAfterAction(e, out) {
+  var p = (e && e.parameter) || {};
+  if (!_FB_SYNC_ACTIONS[p.action]) return;       // every other action: do nothing, no delay
+  var text = out.getContent(), res;
+  try { res = JSON.parse(text.slice(text.indexOf("(") + 1, text.lastIndexOf(")"))); } catch (x) { return; }
+  if (!res || res.status === "error") return;    // action failed, nothing changed
+
+  var id = String(p.UserId || p.userId || "").trim();
+  if (!id && p.action === "addUser") {           // new member: id is created by the server
+    var m = String(p.Mobile || "").replace(/\D/g, "");
+    var row = getSheetData(SHEETS.USERS).find(function (r) { return String(r.Mobile).replace(/\D/g, "") === m; });
+    id = row ? String(row.UserId) : "";
+  }
+  if (!id) return;
+  try { _fbSyncUser(id); }
+  catch (err) {
+    _fbQueueAdd(id);
+    logAction("System", "FIREBASE_SYNC_FAILED", "UserId: " + id + " | " + p.action, err.message, "", { severity: "WARN", result: "FAILURE" });
+  }
+}
+
+function _fbHexToB64(hex) {
+  var bytes = [];
+  for (var i = 0; i < hex.length; i += 2) { var v = parseInt(hex.substr(i, 2), 16); bytes.push(v > 127 ? v - 256 : v); }
+  return Utilities.base64Encode(bytes);
+}
+
+// Sheet row -> Firebase account record (null if the row cannot be a Firebase login)
+function _fbUserRecord(u) {
+  var id = String(u.UserId || "").trim();
+  var mobile = String(u.Mobile || "").replace(/\D/g, "");
+  var hash = String(u.Password || "").trim().toLowerCase();
+  var status = String(u.Status || "").trim().toLowerCase();
+  if (!id || (status !== "active" && status !== "inactive")) return null;
+  if (!/^[6-9]\d{9}$/.test(mobile) || !/^[0-9a-f]{64}$/.test(hash)) return null;
+  return {
+    localId: id, email: mobile + "@mandir.app", emailVerified: true,
+    displayName: String(u.Name || "").trim(), passwordHash: _fbHexToB64(hash),
+    disabled: status === "inactive",
+    customAttributes: JSON.stringify({ role: String(u.Role || "user").trim().toLowerCase() })
+  };
+}
+
+function _fbUpload(records) {
+  var res = _fbAdmin("accounts:batchCreate", { allowOverwrite: true, hashAlgorithm: "SHA256", rounds: 1, users: records });
+  if (res.error && res.error.length) throw new Error("batchCreate: " + JSON.stringify(res.error).slice(0, 200));
+}
+
+function _fbDelete(id) {
+  try { _fbAdmin("accounts:delete", { localId: id }); }
+  catch (err) { if (!/USER_NOT_FOUND|not found/i.test(String(err.message))) throw err; }
+}
+
+// Make Firebase match the sheet for ONE member. Returns a short text result.
+function _fbSyncUser(userId) {
+  var id = String(userId || "").trim();
+  if (!id) return "skipped: no id";
+  bustSheetCache(SHEETS.USERS);                  // read the sheet as it is NOW (updateUser reads it earlier in the same request)
+  var u = getSheetData(SHEETS.USERS).find(function (r) { return String(r.UserId).trim() === id; });
+  if (!u) { _fbDelete(id); return "deleted from Firebase (not in sheet)"; }
+  var rec = _fbUserRecord(u);
+  if (!rec) return "skipped: status '" + u.Status + "' or incomplete row";
+  _fbUpload([rec]);
+  return "synced";
+}
+
+// ── retry queue ──
+function _fbQueueAdd(id) {
+  var lock = LockService.getScriptLock();
+  try { lock.waitLock(5000); } catch (x) { return; }
+  try {
+    var props = PropertiesService.getScriptProperties();
+    var q = JSON.parse(props.getProperty("FB_SYNC_QUEUE") || "[]");
+    if (q.indexOf(id) === -1) q.push(id);
+    props.setProperty("FB_SYNC_QUEUE", JSON.stringify(q));
+  } finally { lock.releaseLock(); }
+}
+
+function retryFirebaseSyncQueue() {
+  var lock = LockService.getScriptLock(), q = [];
+  try { lock.waitLock(5000); } catch (x) { return; }
+  try {
+    var props = PropertiesService.getScriptProperties();
+    q = JSON.parse(props.getProperty("FB_SYNC_QUEUE") || "[]");
+    if (q.length) props.deleteProperty("FB_SYNC_QUEUE");
+  } finally { lock.releaseLock(); }
+  q.forEach(function (id) { try { _fbSyncUser(id); } catch (err) { _fbQueueAdd(id); } });
+}
+
+// Run ONCE: installs the 10-minute retry trigger.
+function setupFirebaseSyncTrigger() {
+  ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === "retryFirebaseSyncQueue") ScriptApp.deleteTrigger(t); });
+  ScriptApp.newTrigger("retryFirebaseSyncQueue").timeBased().everyMinutes(10).create();
+}
+
+// Optional, run by hand when you want: re-copies EVERY member from the sheet to Firebase.
+function reconcileFirebaseUsers() {
+  var recs = [], skipped = 0;
+  getSheetData(SHEETS.USERS).forEach(function (u) { var r = _fbUserRecord(u); if (r) recs.push(r); else skipped++; });
+  for (var i = 0; i < recs.length; i += 100) _fbUpload(recs.slice(i, i + 100));
+  Logger.log("Reconciled " + recs.length + " member(s). Skipped " + skipped + " (pending / rejected / incomplete).");
+}
+
+// Safe test. Run it BEFORE you deploy. It touches only the fake test account and re-saves your first member unchanged.
+function testFirebaseSync() {
+  if (typeof _doGetCore !== "function") { Logger.log("STOP: rename 'function doGet(e)' to 'function _doGetCore(e)' first."); return; }
+  Logger.log("1) fake test account TEST-00001 -> " + _fbSyncUser("TEST-00001"));          // not in sheet => removed from Firebase
+  var first = String(getSheetData(SHEETS.USERS)[0].UserId);
+  Logger.log("2) first member " + first + " -> " + _fbSyncUser(first));
+  var r = _fbAdmin("accounts:lookup", { localId: [first] }).users;
+  Logger.log("3) Firebase now shows: " + (r && r[0] ? r[0].email + " | disabled=" + !!r[0].disabled + " | " + r[0].customAttributes : "NOT FOUND"));
+}
+
+
+// ════════════════════════════════════════════════════════════════
+//  FIREBASE (3/8): copies sheet data to Firestore (members, contributions, types, occasions, goals)
+// ════════════════════════════════════════════════════════════════
+var _FS_COLLECTIONS = [
+  { name: "users",         sheet: SHEETS.USERS,         idCol: "UserId",     clean: function (u) { return _fsCleanUser(u); } },
+  { name: "contributions", sheet: SHEETS.CONTRIBUTIONS, idCol: "Id" },
+  { name: "types",         sheet: SHEETS.TYPES,         idCol: "TypeId" },
+  { name: "occasions",     sheet: SHEETS.OCCASIONS,     idCol: "OccasionId" },
+  { name: "goals",         sheet: SHEETS.GOALS,         idCol: "GoalId" }
+];
+
+// Member row -> safe document (no password / session fields) + IsDefaultPwd flag
+function _fsCleanUser(u) {
+  var out = {}, skip = { Password: 1, SessionToken: 1, TokenExpiry: 1, SessionTTL: 1 };
+  Object.keys(u).forEach(function (k) { if (!skip[k]) out[k] = u[k]; });
+  out.IsDefaultPwd = String(u.Password || "").toLowerCase().trim() === hashPassword("JaiShreeRam");
+  return out;
+}
+
+function _fsId(v) { return String(v === null || v === undefined ? "" : v).trim().replace(/\//g, "_"); }
+
+function _fsValue(v) {
+  if (v === null || v === undefined) return { nullValue: null };
+  if (v instanceof Date) return { stringValue: v.toISOString() };            // same text the browser got before
+  if (typeof v === "boolean") return { booleanValue: v };
+  if (typeof v === "number") return isFinite(v) ? (Math.floor(v) === v ? { integerValue: String(v) } : { doubleValue: v }) : { nullValue: null };
+  return { stringValue: String(v) };
+}
+
+function _fsFields(obj) {
+  var f = {};
+  Object.keys(obj).forEach(function (k) { if (obj[k] !== undefined) f[k] = _fsValue(obj[k]); });
+  return f;
+}
+
+function _fsHash(obj) {
+  var d = Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, JSON.stringify(obj));
+  return d.map(function (b) { return ("0" + ((b < 0 ? b + 256 : b)).toString(16)).slice(-2); }).join("");
+}
+
+function _fsDocName(coll, id) {
+  return "projects/" + FB_PROJECT_ID + "/databases/(default)/documents/" + coll + "/" + id;
+}
+
+function _fsCommit(writes) {
+  var res = UrlFetchApp.fetch("https://firestore.googleapis.com/v1/projects/" + FB_PROJECT_ID + "/databases/(default)/documents:commit", {
+    method: "post", contentType: "application/json",
+    headers: { Authorization: "Bearer " + _fbAdminToken() },
+    payload: JSON.stringify({ writes: writes }), muteHttpExceptions: true
+  });
+  var code = res.getResponseCode();
+  if (code >= 300) throw new Error("Firestore commit failed (" + code + "): " + String(res.getContentText()).slice(0, 300));
+}
+
+// Hidden helper sheet that remembers what was already copied (so only changes are sent).
+function _fsStateSheet() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName("_FS_STATE");
+  if (!sh) { sh = ss.insertSheet("_FS_STATE"); sh.getRange(1, 1, 1, 2).setValues([["Key", "Hash"]]); sh.hideSheet(); }
+  return sh;
+}
+function _fsLoadState() {
+  var sh = _fsStateSheet(), st = {};
+  if (sh.getLastRow() > 1) sh.getRange(2, 1, sh.getLastRow() - 1, 2).getValues().forEach(function (r) { if (r[0]) st[String(r[0])] = String(r[1]); });
+  return st;
+}
+function _fsSaveState(st) {
+  var sh = _fsStateSheet(), rows = Object.keys(st).map(function (k) { return [k, st[k]]; });
+  if (sh.getLastRow() > 1) sh.getRange(2, 1, sh.getLastRow() - 1, 2).clearContent();
+  if (rows.length) sh.getRange(2, 1, rows.length, 2).setValues(rows);
+}
+
+function syncFirestoreNow() {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    var state = _fsLoadState(), finalState = {};
+    Object.keys(state).forEach(function (k) { finalState[k] = state[k]; });
+    var ops = [], counts = {};
+
+    _FS_COLLECTIONS.forEach(function (c) {
+      var rows = getSheetData(c.sheet), seen = {}, same = 0, dups = 0;
+      counts[c.name] = { up: 0, del: 0 };
+      rows.forEach(function (r) {
+        var id = _fsId(r[c.idCol] !== undefined ? r[c.idCol] : r[Object.keys(r)[0]]);   // no named id column: use the first column
+        if (!id) return;
+        var key = c.name + "/" + id;
+        if (seen[key]) dups++;
+        seen[key] = true;
+        var doc = c.clean ? c.clean(r) : r, h = _fsHash(doc);
+        if (state[key] === h) { same++; return; }
+        ops.push({ key: key, hash: h, write: { update: { name: _fsDocName(c.name, id), fields: _fsFields(doc) } }, coll: c.name });
+        counts[c.name].up++;
+      });
+      Object.keys(state).forEach(function (key) {            // in Firestore before, gone from the sheet now
+        if (key.indexOf(c.name + "/") === 0 && !seen[key]) {
+          ops.push({ key: key, hash: null, write: { delete: _fsDocName(c.name, key.slice(c.name.length + 1)) }, coll: c.name });
+          counts[c.name].del++;
+        }
+      });
+      counts[c.name].same = same; counts[c.name].dups = dups;
+    });
+
+    var failed = null;
+    for (var i = 0; i < ops.length && !failed; i += 400) {
+      var chunk = ops.slice(i, i + 400);
+      try {
+        _fsCommit(chunk.map(function (o) { return o.write; }));
+        chunk.forEach(function (o) { if (o.hash === null) delete finalState[o.key]; else finalState[o.key] = o.hash; });
+      } catch (err) { failed = err; }
+    }
+    _fsSaveState(finalState);                                 // keeps progress even if a later chunk failed
+    _FS_COLLECTIONS.forEach(function (c) {
+      var n = counts[c.name];
+      Logger.log(c.name + ": " + n.up + " written, " + n.del + " removed, " + n.same + " unchanged" + (n.dups ? ", " + n.dups + " DUPLICATE id(s)" : ""));
+    });
+    if (failed) throw failed;
+    return counts;
+  } finally { lock.releaseLock(); }
+}
+
+
+// ════════════════════════════════════════════════════════════════
+//  FIREBASE (4/8): fast login + automatic Firestore copy (1-minute tick)
+// ════════════════════════════════════════════════════════════════
+var FB_WEB_API_KEY = "AIzaSyCrGHBWVXAqvrEu_W1sItLrJXwj7gawVKY";   // public Firebase web key (safe to keep here)
+
+// ── new action "firebaseSession": registers the browser's session token after a Firebase login ──
+function _fsEarly(e) {
+  var p = (e && e.parameter) || {};
+  if (p.action !== "firebaseSession") return null;
+  var cb = /^[A-Za-z0-9_$.]{1,80}$/.test(p.callback || "") ? p.callback : "callback";
+  var out;
+  try { out = _fbSessionRegister(p); }
+  catch (err) { out = { status: "error", errorCode: "server", message: String(err.message).slice(0, 160) }; }
+  return ContentService.createTextOutput(cb + "(" + JSON.stringify(out) + ")").setMimeType(ContentService.MimeType.JAVASCRIPT);
+}
+
+// Asks Google "is this Firebase login token real, not expired, and whose is it?"
+function _fbVerifyIdToken(idToken) {
+  var res = UrlFetchApp.fetch("https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=" + encodeURIComponent(FB_WEB_API_KEY), {
+    method: "post", contentType: "application/json", payload: JSON.stringify({ idToken: idToken }), muteHttpExceptions: true
+  });
+  var body = {};
+  try { body = JSON.parse(res.getContentText()); } catch (x) {}
+  if (res.getResponseCode() >= 300 || !body.users || !body.users[0]) throw new Error("idToken rejected: " + ((body.error && body.error.message) || res.getResponseCode()));
+  if (body.users[0].disabled) throw new Error("account disabled");
+  return { uid: String(body.users[0].localId), email: body.users[0].email };
+}
+
+function _fbSessionRegister(p) {
+  var userId = String(p.userId || "").trim(), token = String(p.token || "").trim();
+  if (!userId || !/^[0-9a-f]{64}$/i.test(token) || !p.idToken) return { status: "error", errorCode: "bad_request", message: "Missing data" };
+  var who;
+  try { who = _fbVerifyIdToken(String(p.idToken)); }
+  catch (err) { return { status: "error", errorCode: "firebase_invalid", message: String(err.message).slice(0, 160) }; }
+  if (who.uid !== userId) return { status: "error", errorCode: "firebase_invalid", message: "Identity mismatch" };
+
+  var lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.USERS);
+    var data = sheet.getDataRange().getValues(), h = data[0];
+    var c = function (n) { return h.indexOf(n); };
+    var iId = c("UserId"), iSt = c("Status"), iTok = c("SessionToken"), iExp = c("TokenExpiry"), iTtl = c("SessionTTL"), iLl = c("LastLogin"), iNm = c("Name"), iRole = c("Role"), iMob = c("Mobile");
+    if (iId < 0 || iTok < 0 || iExp < 0) return { status: "error", errorCode: "server", message: "USERS sheet columns missing" };
+    var r = -1;
+    for (var i = 1; i < data.length; i++) { if (String(data[i][iId]).trim() === userId) { r = i; break; } }
+    if (r < 0) return { status: "error", errorCode: "not_found", message: "Member not found" };
+    if (String(data[r][iSt]).trim().toLowerCase() !== "active") return { status: "error", errorCode: "inactive", message: "Account is not active" };
+
+    var hash = _hashSessionToken(token), now = Date.now();
+    if (String(data[r][iTok]) === hash && Number(data[r][iExp]) > now) return { status: "success", sessionSet: true, already: true };   // retry of the same request
+
+    var remember = String(p.rememberMe) === "true";
+    var ttl = remember ? 24 * 60 * 60 * 1000 : 30 * 60 * 1000;
+    sheet.getRange(r + 1, iTok + 1).setValue(hash);
+    sheet.getRange(r + 1, iExp + 1).setValue(now + ttl);
+    if (iTtl >= 0) sheet.getRange(r + 1, iTtl + 1).setValue(ttl);
+    if (iLl >= 0) sheet.getRange(r + 1, iLl + 1).setValue(formatDate());
+    _bustSheetCache("c_users_verify");
+    logAction(String(data[r][iNm]), "Login", "Mobile: " + data[r][iMob] + " | Role: " + data[r][iRole] + " | UserId: " + userId + " | Firebase", "User initiated login (Firebase)", "");
+    return { status: "success", sessionSet: true };
+  } finally { lock.releaseLock(); }
+}
+
+// ── automatic Firestore copy: any write action marks "dirty"; a 1-minute tick copies changes ──
+var _FS_DIRTY_RE = /^(add|update|delete|approve|reject|restore|reset|change|resolve|register|verify|submit|edit|save)/i;
+function _fsMarkDirty(e, out) {
+  var a = e && e.parameter && e.parameter.action;
+  if (a && _FS_DIRTY_RE.test(a)) CacheService.getScriptCache().put("fs_dirty", "1", 21600);
+}
+
+function fsSyncTick() {
+  var cache = CacheService.getScriptCache(), props = PropertiesService.getScriptProperties();
+  var now = Date.now(), last = Number(props.getProperty("FS_LAST_FULL") || 0);
+  if (!cache.get("fs_dirty") && now - last < 30 * 60 * 1000) return;       // nothing changed: leave at once
+  cache.remove("fs_dirty");
+  try { syncFirestoreNow(); props.setProperty("FS_LAST_FULL", String(now)); }
+  catch (err) {
+    cache.put("fs_dirty", "1", 21600);                                       // try again next minute
+    if (!cache.get("fs_fail_logged")) {
+      cache.put("fs_fail_logged", "1", 1800);
+      logAction("System", "FIRESTORE_SYNC_FAILED", "", err.message, "", { severity: "WARN", result: "FAILURE" });
+    }
+  }
+}
+
+
+
+
+// ════════════════════════════════════════════════════════════════
+//  FIREBASE (5/8): admin tables (expenses, expense types, year config)
+// ════════════════════════════════════════════════════════════════
+_FS_COLLECTIONS.push(
+  { name: "expenses",     sheet: SHEETS.EXPENSES,      idCol: "Id" },
+  { name: "expenseTypes", sheet: SHEETS.EXPENSE_TYPES, idCol: "__first__" },
+  { name: "yearConfig",   sheet: "YEAR_CONFIG",        idCol: "__first__" }
+);
+
+
+// ════════════════════════════════════════════════════════════════
+//  FIREBASE (6/8): contribution requests
+// ════════════════════════════════════════════════════════════════
+_FS_COLLECTIONS.push({ name: "contributionRequests", sheet: "CONTRIBUTION_REQUESTS", idCol: "ReqId" });
+
+
+// ════════════════════════════════════════════════════════════════
+//  FIREBASE (7/8): broadcasts, birthday wishes, today's birthdays
+// ════════════════════════════════════════════════════════════════
+_FS_COLLECTIONS.push(
+  { name: "broadcasts", sheet: SHEETS.BROADCAST, idCol: "BcId",
+    clean: function (r) {                       // same readable time the old reply gave
+      var o = {}; Object.keys(r).forEach(function (k) { o[k] = r[k]; });
+      if (o.Time instanceof Date) o.Time = Utilities.formatDate(o.Time, "GMT+5:30", "dd MMM yyyy, hh:mm a");
+      return o;
+    } },
+  { name: "wishes", sheet: SHEETS.WISHES, idCol: "WishId" }
+);
+
+// Today's birthdays (IST) in ONE small document, so members never get everyone's birth dates.
+function _fsSyncBirthdays(force) {
+  var props = PropertiesService.getScriptProperties();
+  var t = _todayIST();
+  var key = t.year + "-" + ("0" + t.month).slice(-2) + "-" + ("0" + t.day).slice(-2);
+  if (!force && props.getProperty("FS_BDAY_DATE") === key) return "already done today";
+  var people = [];
+  getSheetData(SHEETS.USERS).forEach(function (u) {
+    if (String(u.Status || "").toLowerCase() !== "active") return;
+    if (u.ShowBirthday === false) return;                       // privacy opt-out, same rule as the old code
+    var dm = _getDobDayMonth(u.DOB);
+    if (!dm || dm.day !== t.day || dm.month !== t.month) return;
+    people.push({ mapValue: { fields: {
+      UserId: { stringValue: String(u.UserId) }, Name: { stringValue: String(u.Name || "") }, PhotoURL: { stringValue: String(u.PhotoURL || "") }
+    } } });
+  });
+  _fsCommit([{ update: { name: _fsDocName("meta", "birthdays"), fields: {
+    date: { stringValue: key }, people: { arrayValue: { values: people } }
+  } } }]);
+  props.setProperty("FS_BDAY_DATE", key);
+  return "wrote " + people.length + " birthday(s) for " + key;
+}
+
+// The new 1-minute trigger: the same sync as before, plus the birthdays document.
+function fsSyncTick2() {
+  var dirty = !!CacheService.getScriptCache().get("fs_dirty");   // read BEFORE fsSyncTick clears it
+  fsSyncTick();
+  try { _fsSyncBirthdays(dirty); } catch (err) { /* tried again next minute */ }
+}
+
+// Run by hand to see today's list.
+function testBirthdaysDoc() { Logger.log(_fsSyncBirthdays(true)); }
+
+
+// ════════════════════════════════════════════════════════════════
+//  FIREBASE (8/8): tiny profile-photo thumbnails + the final 1-minute trigger
+// ════════════════════════════════════════════════════════════════
+var PHOTO_THUMB_SHEET = "PHOTO_THUMBS";
+_FS_COLLECTIONS.push({ name: "photoThumbs", sheet: PHOTO_THUMB_SHEET, idCol: "UserId" });
+
+function _fsThumbSheet() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet(), sh = ss.getSheetByName(PHOTO_THUMB_SHEET);
+  if (!sh) { sh = ss.insertSheet(PHOTO_THUMB_SHEET); sh.getRange(1, 1, 1, 3).setValues([["UserId", "FileId", "Thumb"]]); sh.hideSheet(); }
+  return sh;
+}
+
+function _fsFileIdFromUrl(url) {
+  var u = String(url || "");
+  if (u.indexOf("lh3.googleusercontent.com/d/") !== -1) return u.split("/d/")[1].split("?")[0].trim();
+  var m = u.match(/[?&]id=([A-Za-z0-9_-]{10,})/);
+  return m ? m[1] : "";
+}
+
+// Small picture of one Drive photo, as a data URL (null if Drive is not ready or it is too big for a cell).
+function _fsMakeThumb(fileId) {
+  try {
+    var res = UrlFetchApp.fetch("https://drive.google.com/thumbnail?id=" + encodeURIComponent(fileId) + "&sz=w160", {
+      headers: { Authorization: "Bearer " + ScriptApp.getOAuthToken() }, muteHttpExceptions: true, followRedirects: true
+    });
+    var h = res.getHeaders() || {}, ct = String(h["Content-Type"] || h["content-type"] || "");
+    var bytes = res.getContent();
+    if (res.getResponseCode() !== 200 || ct.indexOf("image/") !== 0 || bytes.length < 300) return null;
+    var url = "data:" + ct.split(";")[0] + ";base64," + Utilities.base64Encode(bytes);
+    return url.length <= 45000 ? url : null;                       // a sheet cell holds at most 50,000 characters
+  } catch (e) { return null; }
+}
+
+// Makes a thumbnail for every member whose photo is new or changed; removes it when the photo is gone.
+function _fsSyncPhotoThumbs(force) {
+  var props = PropertiesService.getScriptProperties(), now = Date.now();
+  if (!force && now - Number(props.getProperty("FS_THUMB_LAST") || 0) < 30 * 60 * 1000) return "skipped (checked recently)";
+  var sh = _fsThumbSheet(), data = sh.getDataRange().getValues(), have = {};
+  for (var i = 1; i < data.length; i++) { if (data[i][0]) have[String(data[i][0])] = { row: i + 1, fileId: String(data[i][1] || "") }; }
+
+  var want = {}, made = 0, failed = 0, removed = 0, budget = 8;     // at most 8 downloads per run
+  getSheetData(SHEETS.USERS).forEach(function (u) {
+    var uid = String(u.UserId || "").trim(), fid = _fsFileIdFromUrl(u.PhotoURL);
+    if (!uid || !fid) return;
+    want[uid] = true;
+    if (have[uid] && have[uid].fileId === fid) return;              // already up to date
+    if (budget <= 0) return;
+    budget--;
+    var thumb = _fsMakeThumb(fid);
+    if (!thumb) { failed++; return; }
+    if (have[uid]) sh.getRange(have[uid].row, 1, 1, 3).setValues([[uid, fid, thumb]]);
+    else sh.appendRow([uid, fid, thumb]);
+    made++;
+  });
+  var del = [];
+  Object.keys(have).forEach(function (uid) { if (!want[uid]) del.push(have[uid].row); });
+  del.sort(function (a, b) { return b - a; }).forEach(function (r) { sh.deleteRow(r); removed++; });
+
+  var unfinished = failed > 0 || budget <= 0;
+  props.setProperty("FS_THUMB_LAST", String(unfinished ? now - 25 * 60 * 1000 : now));   // unfinished: look again in about 5 minutes
+  if (made || removed) CacheService.getScriptCache().put("fs_dirty", "1", 21600);         // the next 1-minute tick copies it to Firestore
+  return "made " + made + ", removed " + removed + ", failed " + failed;
+}
+
+// The new 1-minute trigger: everything the previous one did, plus the photo thumbnails.
+function fsSyncTick3() {
+  var dirty = !!CacheService.getScriptCache().get("fs_dirty");   // read BEFORE the sync clears it
+  fsSyncTick2();
+  try { _fsSyncPhotoThumbs(dirty); } catch (err) { /* tried again later */ }
+}
+
+function setupFirestoreSyncTrigger3() {
+  ScriptApp.getProjectTriggers().forEach(function (t) {
+    var h = t.getHandlerFunction();
+    if (h === "fsSyncTick" || h === "fsSyncTick2" || h === "fsSyncTick3") ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger("fsSyncTick3").timeBased().everyMinutes(1).create();
+}
+
+// Run by hand.
+function testPhotoThumbs() { Logger.log(_fsSyncPhotoThumbs(true)); }

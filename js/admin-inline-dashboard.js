@@ -279,6 +279,17 @@ var dash_contributions = [];
       return p.length === 3 ? `${p[2]}-${p[1]}-${p[0]}` : "0";
     }
 
+    /* Full timestamp version ("dd-MM-yyyy HH:mm:ss" -> "yyyy-MM-dd HH:mm:ss").
+       _dash_parseDateSort() drops the time, so entries made on the SAME day
+       tied and kept sheet order (oldest first) — the newest entry of the day
+       ended up last, often on the last page. Used as a tiebreak for "newest first". */
+    function _dash_parseDateTimeSort(str) {
+      const parts = String(str || "").trim().split(" ");
+      const d = _dash_parseDateSort(parts[0]);
+      return d + " " + (parts[1] || "00:00:00");
+    }
+    window._dash_parseDateTimeSort = _dash_parseDateTimeSort;
+
     function _dash_renderTxnPage() {
       const totalPages = Math.ceil(_dash_txnRows.length / _DASH_TXN_PG);
       const start  = (_dash_txnPage - 1) * _DASH_TXN_PG;

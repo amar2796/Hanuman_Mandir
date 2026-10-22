@@ -40,6 +40,7 @@
   <link rel="stylesheet" href="css/admin-status-extra.css" />
   <link rel="stylesheet" href="css/admin-tracker-v4.css" />
   <link rel="stylesheet" href="css/admin-wave-tabs.css" />
+  <link rel="stylesheet" href="css/admin-daybook.css" />
   <!-- PREVIEW: modernized design system + components (v2) -->
   <link rel="stylesheet" href="design-system-v2.css" />
   <link rel="stylesheet" href="components-v2.css" />
@@ -199,6 +200,9 @@
         </li>
         <li onclick="showPage('yearSummaryPage',this)" class="nav-finance" data-label="Year Summary">
           <i class="fa-solid fa-calendar-check"></i> <span class="nav-label">Year Summary</span>
+        </li>
+        <li onclick="showPage('dayBookPage',this)" class="nav-finance" data-label="Day Book">
+          <i class="fa-solid fa-book"></i> <span class="nav-label">Day Book</span>
         </li>
         <li onclick="showPage('contributionRequestsPage',this)" class="nav-finance" id="nav_requests" data-label="Requests">
           <i class="fa-solid fa-inbox"></i> <span class="nav-label">Requests</span>
@@ -379,6 +383,7 @@
       "pages/usersPage.html",
       "pages/goalsPage.html",
       "pages/yearSummaryPage.html",
+      "pages/dayBookPage.html",
       "pages/contributionRequestsPage.html",
       "pages/eventsPage.html",
       "pages/masterPage.html",
@@ -479,6 +484,12 @@
   <script src="js/admin-user-review.js"></script>
   <script src="js/admin-event-review.js"></script>
   <script src="js/admin-close-guard.js"></script>
+  <script src="js/admin-select-mode.js"></script>
+  <script src="js/admin-receipt-resend.js"></script>
+  <script src="js/admin-event-report.js"></script>
+  <script src="js/admin-daybook.js"></script>
+  <script src="js/admin-expense-duplicate.js"></script>
+  <script src="js/admin-year-lock.js"></script>
 
   <!-- Reusable single-date calendar (Add/Edit User → DOB, Contribution Start Date)
        Deliberately placed here, outside any .page wrapper — those are hidden via

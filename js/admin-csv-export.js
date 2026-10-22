@@ -106,14 +106,16 @@
     /* ═══ CSV EXPORT — EXPENSES ══════════════════════════════════════
        Exports whatever is currently visible after filters are applied.
        ═══════════════════════════════════════════════════════════════ */
-    function exportExpenseCSV() {
+    function exportExpenseCSV(preSelectedList) {
       toast("⏳ Preparing expenses CSV...", "warn");
       setTimeout(function() {
       const txt = (document.getElementById("searchExpense")?.value || "").toLowerCase(); // FIX: was undefined
       const yr = document.getElementById("expFilterYear")?.value || "";
       const mo = document.getElementById("expFilterMonth")?.value || "";
 
-      const list = expenses.filter(function (e) {
+      // "Export Selected" passes the checked records; the main Export CSV button passes
+      // nothing and behaves exactly as before.
+      const list = (Array.isArray(preSelectedList) ? preSelectedList : null) || expenses.filter(function (e) {
         const tName = expenseTypes.find(t => String(t.ExpenseTypeId) === String(e.ExpenseTypeId))?.Name || "";
         const mn = e.ForMonth || e.Note || "";
         const textMatch = !txt ||
@@ -161,8 +163,38 @@
       const filename = "expenses" + filterTag + "_exported_" + dateTag + ".csv";
 
       _downloadCSV([headers.join(","), ...rows].join("\n"), filename);
-      toast("✅ " + list.length + " expense records exported", "");
+      toast("✅ " + list.length + (preSelectedList ? " selected" : "") + " expense records exported", "");
       }, 50);
+    }
+
+
+    /* ═══ CSV EXPORT — MEMBERS ════════════════════════════════════════
+       Exports the members currently listed on the Users page (so the Role / Status
+       tabs and the search box apply), or just the ticked rows when a list is passed.
+       Passwords / login tokens are never included.
+       ═══════════════════════════════════════════════════════════════ */
+    function exportUsersCSV(preSelectedList) {
+      const list = (Array.isArray(preSelectedList) ? preSelectedList : null) || window._userList || users || [];
+      if (!list.length) { toast("No members to export", "warn"); return; }
+      const totals = {};
+      (typeof data !== "undefined" ? data : []).forEach(function (c) {
+        totals[c.UserId] = (totals[c.UserId] || 0) + Number(c.Amount || 0);
+      });
+      const headers = ["#", "Member ID", "Name", "Mobile", "Email", "Role", "Status", "Village", "Address",
+                       "Date of Birth", "Contribution Start", "Registered On", "Total Contributed (₹)"];
+      const rows = list.map(function (u, i) {
+        return [
+          i + 1, u.UserId || "", u.Name || "", u.Mobile || "", u.Email || "", u.Role || "User",
+          u.Status || "Active", u.Village || "", u.Address || "",
+          u.DOB || "", u.ContribStartDate || "", u.RegisteredAt || "",
+          Number(totals[u.UserId] || 0)
+        ].map(function (v) { return '"' + String(v).replace(/"/g, '""') + '"'; }).join(",");
+      });
+      const roleTag = window._userFilterRole && window._userFilterRole !== "all" ? "_" + window._userFilterRole : "";
+      const statusTag = window._userFilterStatus && window._userFilterStatus !== "all" ? "_" + window._userFilterStatus : "";
+      const filename = "members" + roleTag + statusTag + (preSelectedList ? "_selected" : "") + "_exported_" + new Date().toISOString().slice(0, 10) + ".csv";
+      _downloadCSV([headers.join(","), ...rows].join("\n"), filename);
+      toast("✅ " + list.length + (preSelectedList ? " selected" : "") + " members exported", "");
     }
 
 
@@ -184,4 +216,4 @@
     }
 
     /* ═══ FEEDBACK ADMIN FUNCTIONS ═══ */
-    /* ══════════ FEEDBACK CONFIRM MODAL ══════════ */
+    /* ══════════ FEEDBACK CONFIRM MODAL ══════════ */

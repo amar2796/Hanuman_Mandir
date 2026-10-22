@@ -55,10 +55,14 @@
       });
 
       // Sort
+      // Same-day entries: tie-break by time of day, then sheet position (later row = newer),
+      // so "newest first" really puts the latest entry on page 1.
+      const _etOrder = new Map((Array.isArray(expenses) ? expenses : []).map((r, i) => [r, i]));
+      const _etTie = (x, y, dir) => dir * (_dash_parseDateTimeSort(x.PaymentDate).localeCompare(_dash_parseDateTimeSort(y.PaymentDate)) || ((_etOrder.get(x) || 0) - (_etOrder.get(y) || 0)));
       _et_filtered.sort((a,b) => {
         const da = _dash_parseDateSort(a.PaymentDate), db = _dash_parseDateSort(b.PaymentDate);
-        if (_et_sortBy === "date_desc")   return db.localeCompare(da);
-        if (_et_sortBy === "date_asc")    return da.localeCompare(db);
+        if (_et_sortBy === "date_desc")   return db.localeCompare(da) || _etTie(a, b, -1);
+        if (_et_sortBy === "date_asc")    return da.localeCompare(db) || _etTie(a, b, 1);
         if (_et_sortBy === "amount_desc") return Number(b.Amount||0) - Number(a.Amount||0);
         if (_et_sortBy === "amount_asc")  return Number(a.Amount||0) - Number(b.Amount||0);
         if (_et_sortBy === "title_asc")   return (a.Title||"").localeCompare(b.Title||"");
@@ -172,4 +176,4 @@
     // ═══════════════════════════════════════════════════════════════════
     // ⚡ CONTRIBUTION TRACKER — Power Filter & Full Track
     // ═══════════════════════════════════════════════════════════════════
-
+

@@ -79,8 +79,22 @@ function _renderPagination(containerId, totalPages, currentPage, onPageFn) {
     }
 
     /* ── RENDER CONTRIBUTIONS — view-only rows, edit via popup ── */
+    /* Newest entry first, so the latest contribution/expense is on page 1 instead of the
+       last page. Orders by PaymentDate + time; entries with the same timestamp keep the
+       sheet order reversed (later row = newer). Returns a sorted COPY (source untouched). */
+    function _newestFirst(list) {
+      var tsOf = function (r) {
+        return (typeof _dash_parseDateTimeSort === "function") ? _dash_parseDateTimeSort(r && r.PaymentDate) : "0";
+      };
+      return (list || []).map(function (r, i) { return { r: r, i: i, t: tsOf(r) }; })
+        .sort(function (a, b) { return b.t.localeCompare(a.t) || (b.i - a.i); })
+        .map(function (x) { return x.r; });
+    }
+    window._newestFirst = _newestFirst;
+
     function render(list) {
       if (!list) list = data;
+      list = _newestFirst(list);
       _contribList = list;
       _contribPage = 1;
       _renderContribPage(1);
@@ -142,6 +156,7 @@ function _renderPagination(containerId, totalPages, currentPage, onPageFn) {
         <td>
           <div class="action-btns">
             <button class="btn-sm btn-info" onclick="viewContrib_receipt('${_rid}')" title="View Receipt"><i class="fa-solid fa-receipt"></i></button>
+            ${isWalkIn ? "" : `<button class="btn-sm" onclick="resendReceiptEmail('${_rid}')" title="Email receipt to member"><i class="fa-solid fa-envelope"></i></button>`}
             <button class="btn-sm" onclick="openEditContrib('${c.Id
             }')" title="Edit"><i class="fa-solid fa-pen"></i></button>
             <button class="btn-sm btn-danger" onclick="deleteContribution('${c.Id
@@ -374,6 +389,7 @@ function _renderPagination(containerId, totalPages, currentPage, onPageFn) {
     /* ── RENDER EXPENSES — view-only rows ── */
     function renderExpenses(list) {
       if (!list) list = expenses;
+      list = _newestFirst(list);
       _expenseList = list;
       _expensePage = 1;
       _renderExpensePage(1);

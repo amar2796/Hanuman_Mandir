@@ -8,6 +8,9 @@
             <button class="sp-action-btn sp-btn-indigo" onclick="spOpen('user')">
               <i class="fa-solid fa-user-plus"></i> Add User
             </button>
+            <button class="sp-action-btn sp-btn-dark" onclick="exportUsersCSV()" title="Exports the members shown below (Role / Status tabs and search apply)">
+              <i class="fa-solid fa-file-csv"></i> Export Members
+            </button>
           </div>
         </div>
         <div class="card-v2">
@@ -29,11 +32,12 @@
             </div>
           </h3>
           <input class="search-bar" id="userSearchInput" placeholder="🔍 Search by Name or Mobile..." />
-          <!-- PREVIEW: bulk action bar -->
+          <!-- Select mode: tick boxes appear only after "Select" is pressed; EXPORT only (no bulk approve/delete). -->
+          <div class="sel-row"><button type="button" class="sel-toggle" onclick="_selModeToggle(this,'userTable','users_bulkBar','users_bulkCount')"><i class="fa-regular fa-square-check"></i> <span>Select</span></button></div>
           <div class="bulk-bar-v2" id="users_bulkBar">
             <span class="count"><span id="users_bulkCount">0</span> selected</span>
             <div class="spacer"></div>
-            <button class="btn-v2 btn-v2-sm btn-v2-outline" style="background:transparent;color:#fff;border-color:rgba(255,255,255,.3);" onclick="alert('Preview only \u2014 bulk approve is not wired to real data in this mockup.')"><i class="fa-solid fa-check"></i> Approve Selected</button>
+            <button class="btn-v2 btn-v2-sm btn-v2-outline" style="background:transparent;color:#fff;border-color:rgba(255,255,255,.3);" onclick="exportSelectedUsersCSV()"><i class="fa-solid fa-file-csv"></i> Export Selected</button>
           </div>
           <div class="table-v2-wrap">
             <div class="table-v2-scroll">

@@ -12,6 +12,7 @@
     { label: "Tracker", page: "trackerPage", icon: "fa-chart-line" },
     { label: "Goals", page: "goalsPage", icon: "fa-bullseye" },
     { label: "Year Summary", page: "yearSummaryPage", icon: "fa-calendar" },
+    { label: "Day Book", page: "dayBookPage", icon: "fa-book" },
     { label: "Requests", page: "contributionRequestsPage", icon: "fa-inbox" },
     { label: "Events", page: "eventsPage", icon: "fa-calendar-days" },
     { label: "Users", page: "usersPage", icon: "fa-users" },

@@ -1325,6 +1325,7 @@
         document.querySelector(".overlay").classList.remove("active");
         document.body.style.overflow = "auto";
       }
+      if (id === "dayBookPage" && typeof dayBookInit === "function") dayBookInit();
       if (id === "galleryAdminPage") loadGalleryAdmin();
       if (id === "announcementPage") loadAnnouncementAdmin();
       // Tracker: re-render with current live data every time the tab is opened,

@@ -126,6 +126,10 @@
           style="padding:7px 14px;font-size:12px;background:#334155;box-shadow:none;">
           <i class="fa-solid fa-list"></i> View Expenses (${evExps.length})
         </button>
+        <button onclick="exportEventReportPDF('${ev.EventId}')" title="Download this event's report (PDF)"
+          style="padding:7px 14px;font-size:12px;background:#7c3aed;box-shadow:none;">
+          <i class="fa-solid fa-file-pdf"></i> Report
+        </button>
         <button onclick="shareEventWhatsApp('${ev.EventId}')"
           style="padding:7px 14px;font-size:12px;background:#25d366;box-shadow:none;">
           <i class="fa-brands fa-whatsapp"></i> Share
