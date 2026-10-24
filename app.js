@@ -1179,60 +1179,73 @@ function closeModal(){
 /* ═══ CONFIRM MODAL ═══ */
 // Usage: confirmModal("Delete this item?", () => { /* confirmed */ }, "Delete", "#e74c3c")
 // confirmColor: "#e74c3c" = danger red (default), "#C1440E" = warning orange, "#22c55e" = safe green
-function confirmModal(message, onConfirm, confirmLabel, confirmColor) {
+/* ── Global confirm look (shared by confirmModal below and admin-confirm.js) ── */
+function _gcmEnsureCSS() {
+  if (document.getElementById("_gcmCSS")) return;
+  var st = document.createElement("style"); st.id = "_gcmCSS";
+  st.textContent = [
+    ".gcm{--gcm-ink:#1e293b;--gcm-mute:#64748b;--gcm-line:#e8edf3;--gcm-soft:#f8fafc;position:relative;color:var(--gcm-ink);font-family:inherit;}",
+    "body.dark-mode .gcm{--gcm-ink:#f1f5f9;--gcm-mute:#94a3b8;--gcm-line:#1e2d45;--gcm-soft:#0f1a2b;}",
+    ".gcm-box{background:#fff;border-radius:18px;max-width:380px;width:100%;overflow:hidden;box-shadow:0 18px 50px rgba(15,23,42,.28);border:1px solid var(--gcm-line);animation:_mS .28s cubic-bezier(.21,1.02,.73,1);}",
+    "body.dark-mode .gcm-box{background:#111827;}",
+    ".gcm-bar{height:4px;background:var(--tone);}",
+    ".gcm-x{position:absolute;top:12px;right:12px;width:28px;height:28px;border-radius:8px;border:0;background:transparent;color:var(--gcm-mute);font-size:18px;line-height:1;cursor:pointer;}",
+    ".gcm-x:hover{background:var(--gcm-soft);}",
+    ".gcm-body{padding:22px 22px 6px;text-align:center;}",
+    ".gcm-ico{width:56px;height:56px;border-radius:50%;margin:0 auto 12px;display:grid;place-items:center;font-size:23px;color:var(--tone);background:rgba(128,128,128,.12);background:color-mix(in srgb,var(--tone) 12%,transparent);box-shadow:0 0 0 7px color-mix(in srgb,var(--tone) 6%,transparent);animation:_cmIconPop .35s cubic-bezier(.34,1.56,.64,1) both;}",
+    "body.dark-mode .gcm .gcm-body p.gcm-title,body.dark-mode #_uniModal .gcm .gcm-body p.gcm-title{color:#f1f5f9!important;}",
+    "body.dark-mode .gcm .gcm-body p.gcm-msg,body.dark-mode #_uniModal .gcm .gcm-body p.gcm-msg{color:#94a3b8!important;}",
+    ".gcm-title{font-size:16px;font-weight:700;margin:0 0 4px;line-height:1.35;color:var(--gcm-ink)!important;}",
+    ".gcm-msg{font-size:12.5px;color:var(--gcm-mute)!important;margin:0 0 14px;line-height:1.5;}",
+    ".gcm-rows{background:var(--gcm-soft);border:1px solid var(--gcm-line);border-radius:12px;padding:4px 12px;margin:0 0 6px;text-align:left;max-height:34vh;overflow:auto;}",
+    ".gcm-row{display:flex;justify-content:space-between;gap:12px;padding:8px 0;font-size:12.5px;border-bottom:1px dashed var(--gcm-line);}",
+    ".gcm-row:last-child{border-bottom:0;}",
+    ".gcm-row>span{color:var(--gcm-mute);flex:0 0 auto;}.gcm-row>b{text-align:right;font-weight:600;word-break:break-word;color:var(--gcm-ink);}",
+    ".gcm-note{font-size:11.5px;color:#92400e;background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:7px 10px;margin:8px 0 0;text-align:left;}",
+    "body.dark-mode .gcm-note{background:#2a2108;border-color:#5b4a12;color:#fcd34d;}",
+    ".gcm-foot{display:flex;gap:10px;padding:16px 22px 20px;}",
+    ".gcm-foot button{flex:1;border-radius:11px;padding:11px 10px;font-size:13px;font-weight:600;cursor:pointer;transition:transform .12s,box-shadow .12s,filter .12s;font-family:inherit;}",
+    ".gcm-cancel{background:transparent;color:var(--gcm-mute);border:1.5px solid var(--gcm-line);}",
+    ".gcm-cancel:hover:not(:disabled){background:var(--gcm-soft);}",
+    ".gcm-ok{border:0;color:#fff;background:var(--tone);box-shadow:0 6px 16px color-mix(in srgb,var(--tone) 35%,transparent);}",
+    ".gcm-ok:hover{filter:brightness(1.07);transform:translateY(-1px);}.gcm-ok:active{transform:scale(.97);}",
+    ".gcm-ok.btn-loading{cursor:wait;pointer-events:none;opacity:.85;}",
+    "#gcmOverlay{position:fixed;inset:0;z-index:2147483000;background:rgba(15,23,42,.55);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;padding:16px;animation:_mF .18s ease;}",
+    "@keyframes _cmIconPop{from{opacity:0;transform:scale(.5) rotate(-10deg)}to{opacity:1;transform:scale(1) rotate(0)}}"
+  ].join("\n");
+  (document.head || document.documentElement).appendChild(st);
+}
+/* Builds the dialog markup. o = {tone, icon, title, msg, rows:[[label,html]], note, cancel, ok, okId, inner} */
+function _gcmCardHtml(o) {
+  var rows = (o.rows || []).map(function (r) { return '<div class="gcm-row"><span>' + r[0] + '</span><b>' + r[1] + '</b></div>'; }).join("");
+  return '<div class="gcm' + (o.inner ? ' gcm-inner' : '') + '" style="--tone:' + (o.tone || "#C1440E") + ';">' +
+    '<div class="gcm-bar"></div>' +
+    '<button type="button" class="gcm-x" aria-label="Close" onclick="' + (o.closeJs || "closeModal()") + '">&#xd7;</button>' +
+    '<div class="gcm-body"><div class="gcm-ico"><i class="fa-solid ' + (o.icon || "fa-circle-question") + '"></i></div>' +
+    '<p class="gcm-title">' + o.title + '</p>' +
+    (o.msg ? '<p class="gcm-msg">' + o.msg + '</p>' : '') +
+    (rows ? '<div class="gcm-rows">' + rows + '</div>' : '') +
+    (o.note ? '<div class="gcm-note">' + o.note + '</div>' : '') +
+    '</div><div class="gcm-foot">' +
+    '<button type="button" class="gcm-cancel" onclick="' + (o.closeJs || "closeModal()") + '">' + (o.cancel || "Cancel") + '</button>' +
+    '<button type="button" class="gcm-ok" id="' + (o.okId || "_confirmOkBtn") + '">' + (o.ok || "Confirm") + '</button>' +
+    '</div></div>';
+}
+
+function confirmModal(message, onConfirm, confirmLabel, confirmColor, details) {
+  _gcmEnsureCSS();
   var label = confirmLabel || "Delete";
   var color = confirmColor || "#e74c3c";
-  // Icon and ring colour — red for danger, orange for warn, green for safe
-  var icon  = color === "#22c55e" ? "fa-circle-check"
-            : color === "#C1440E" ? "fa-triangle-exclamation"
-            : "fa-triangle-exclamation";
-  var ringRgb = color === "#22c55e" ? "34,197,94"
-              : color === "#C1440E" ? "15, 118, 110"
-              : "231,76,60";
-  var html = `
-    <div style="height:4px;background:${color};border-radius:16px 16px 0 0;"></div>
-    <div class="_mhdr" style="background:#fff;border-bottom:1px solid #f1f5f9;border-radius:0;padding:16px 20px 12px;">
-      <span></span>
-      <button class="_mcls" onclick="closeModal()" style="color:#94a3b8!important;font-size:20px;line-height:1;">&#xd7;</button>
-    </div>
-    <div class="_mbdy" style="text-align:center;padding:6px 28px 28px;">
-      <div style="
-        width:68px;height:68px;border-radius:50%;margin:0 auto 18px;
-        background:rgba(${ringRgb},0.1);
-        display:flex;align-items:center;justify-content:center;
-        box-shadow:0 0 0 8px rgba(${ringRgb},0.07), 0 0 0 16px rgba(${ringRgb},0.03);
-        animation:_cmIconPop .35s cubic-bezier(.34,1.56,.64,1) both;
-      ">
-        <i class="fa-solid ${icon}" style="font-size:28px;color:${color};"></i>
-      </div>
-      <p style="font-size:15.5px;font-weight:600;color:#1e293b;margin:0 0 6px;line-height:1.4;">${message}</p>
-      <p style="font-size:12.5px;color:#94a3b8;margin:0 0 24px;">This action cannot be undone.</p>
-      <div style="display:flex;gap:10px;justify-content:center;">
-        <button class="_mbtn _cmCancel" style="
-          background:transparent;color:#64748b;min-width:104px;
-          border:1.5px solid #e2e8f0;font-size:13.5px;border-radius:10px;
-        " onclick="closeModal()">
-          <i class="fa-solid fa-xmark" style="margin-right:5px;"></i>Cancel
-        </button>
-        <button class="_mbtn" id="_confirmOkBtn" style="
-          background:${color};min-width:104px;font-size:13.5px;border-radius:10px;
-          box-shadow:0 4px 14px rgba(${ringRgb},0.35);
-        ">
-          <i class="fa-solid fa-check" style="margin-right:5px;"></i>${label}
-        </button>
-      </div>
-    </div>
-    <style>
-      @keyframes _cmIconPop{
-        from{opacity:0;transform:scale(.5) rotate(-10deg)}
-        to{opacity:1;transform:scale(1) rotate(0deg)}
-      }
-      ._cmCancel:hover:not(:disabled){background:#f8fafc!important;border-color:#94a3b8!important;color:#334155!important;}
-      #_confirmOkBtn:hover{filter:brightness(1.08);transform:translateY(-1px);}
-      #_confirmOkBtn:active{transform:scale(0.97) translateY(0);}
-      #_confirmOkBtn.btn-loading{cursor:wait;pointer-events:none;opacity:0.85;}
-    </style>`;
-  openModal(html, "340px");
+  var danger = (color === "#e74c3c");
+  var html = _gcmCardHtml({
+    tone: color,
+    icon: danger ? "fa-trash-can" : (color === "#22c55e" ? "fa-circle-check" : "fa-triangle-exclamation"),
+    title: message,
+    rows: details,
+    note: danger ? "This action cannot be undone." : "",
+    ok: label
+  });
+  openModal(html, "380px");
   setTimeout(function() {
     var btn = document.getElementById("_confirmOkBtn");
     if (!btn) return;
@@ -1248,7 +1261,7 @@ function confirmModal(message, onConfirm, confirmLabel, confirmColor) {
       btn.innerHTML = '<span class="btn-original-content" style="display:none">' + btn.innerHTML + '</span><span class="btn-loading-txt"> Processing…</span>';
       btn.classList.add("btn-loading");
       // Also disable cancel button and backdrop click so user can't dismiss mid-action
-      var cancelBtn = document.querySelector("._cmCancel");
+      var cancelBtn = document.querySelector("#_uniModal .gcm-cancel");
       if (cancelBtn) { cancelBtn.disabled = true; cancelBtn.style.opacity = "0.4"; }
       var overlay = document.getElementById("_uniModal");
       if (overlay) overlay._confirmInProgress = true;
@@ -1901,7 +1914,7 @@ async function _generateQRDataUrl(text, sizePx) {
 
 /* ═══ VIEW-ONLY DETAIL POPUP ═══ */
 function showDetailPopup(title, rows, editFn){
-  let rowsHtml = rows.map(r=>`<div class="_row"><span class="_rl">${escapeHtml(String(r[0]||""))}</span><span class="_rv">${escapeHtml(String(r[1]||""))}</span></div>`).join("");
+  let rowsHtml = rows.map(r=>`<div class="_row"><span class="_rl">${escapeHtml(String(r[0]||""))}</span><span class="_rv">${/^<(span|a|i|b|strong)[\s>]/.test(String(r[1]||"")) ? String(r[1]) : escapeHtml(String(r[1]||""))}</span></div>`).join("");
   let editBtn = editFn ? `<button class="_mbtn" style="background:#C1440E;" onclick="${editFn}"><i class="fa-solid fa-pen"></i> Edit</button>` : "";
   let html=`
     <div class="_mhdr"><h3><i class="fa-solid fa-eye"></i> ${title}</h3><button class="_mcls" onclick="closeModal()">×</button></div>

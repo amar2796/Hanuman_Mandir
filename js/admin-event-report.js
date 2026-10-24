@@ -56,7 +56,7 @@
   function header(doc, title, sub) {
     var W = doc.internal.pageSize.getWidth();
     doc.setFillColor(30, 41, 64); doc.rect(0, 0, W, 28, "F");
-    doc.setTextColor(15, 118, 110); doc.setFontSize(14); doc.setFont(undefined, "bold");
+    doc.setTextColor(251, 191, 36); doc.setFontSize(14); doc.setFont(undefined, "bold");
     doc.text(nameOf().toUpperCase(), W / 2, 12, { align: "center" });
     doc.setTextColor(148, 163, 184); doc.setFontSize(9); doc.setFont(undefined, "normal");
     doc.text(title, W / 2, 20, { align: "center" });
@@ -135,7 +135,7 @@
       doc.setFontSize(11); doc.setFont(undefined, "bold"); doc.text("Spend by type", M, Y); Y += 2;
       doc.autoTable({
         head: [["Type", "Amount", "Share"]], body: typeRows, startY: Y + 1, margin: { left: M, right: M },
-        headStyles: { fillColor: [30, 41, 64], textColor: [15, 118, 110], fontSize: 9 }, styles: { fontSize: 9 },
+        headStyles: { fillColor: [30, 41, 64], textColor: [251, 191, 36], fontSize: 9 }, styles: { fontSize: 9 },
         columnStyles: { 1: { halign: "right" }, 2: { halign: "right" } }
       });
       Y = doc.lastAutoTable.finalY + 8;
@@ -152,7 +152,7 @@
       head: [["#", "Date", "Title", "Type", "Month", "Amount"]], body: rows.length ? rows : [["", "", "No expenses recorded", "", "", ""]],
       foot: rows.length ? [["", "", "Total", "", "", money(spent)]] : undefined,
       startY: Y + 1, margin: { left: M, right: M },
-      headStyles: { fillColor: [30, 41, 64], textColor: [15, 118, 110], fontSize: 9 },
+      headStyles: { fillColor: [30, 41, 64], textColor: [251, 191, 36], fontSize: 9 },
       footStyles: { fillColor: [241, 245, 249], textColor: [30, 41, 64], fontStyle: "bold", fontSize: 9 },
       styles: { fontSize: 8.5 }, alternateRowStyles: { fillColor: [250, 248, 243] },
       columnStyles: { 0: { cellWidth: 9 }, 5: { halign: "right" } }
@@ -194,7 +194,7 @@
       body: rows,
       foot: [["Total", "", "", "", tb > 0 ? money(tb) : "—", money(ts), "", ""]],
       startY: 34, margin: { left: M, right: M },
-      headStyles: { fillColor: [30, 41, 64], textColor: [15, 118, 110], fontSize: 8 },
+      headStyles: { fillColor: [30, 41, 64], textColor: [251, 191, 36], fontSize: 8 },
       footStyles: { fillColor: [241, 245, 249], textColor: [30, 41, 64], fontStyle: "bold", fontSize: 8 },
       styles: { fontSize: 7.5, cellPadding: 1.8 }, alternateRowStyles: { fillColor: [250, 248, 243] },
       columnStyles: { 4: { halign: "right" }, 5: { halign: "right" }, 6: { halign: "right" }, 7: { halign: "right" } }

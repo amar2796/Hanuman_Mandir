@@ -1,0 +1,124 @@
+/* ════════════════════════════════════════════════════════════
+   admin-dashboard-polish.css — Financial Tracker page polish.
+   Look-and-feel only; no logic touched.
+   ════════════════════════════════════════════════════════════ */
+
+/* ── Backup + refresh: one slim line ── */
+#dash-topbar{display:flex !important;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:8px 12px !important;border-radius:14px !important;box-shadow:0 1px 2px rgba(15,23,42,.05) !important;border:1px solid #eef2f6;}
+#dash-topbar #localDownloadBanner{flex:1 1 320px;min-width:0;}
+#dash-topbar #localDownloadBanner > div:first-child{width:28px !important;height:28px !important;}
+#dash-topbar > div:last-child{flex:0 1 auto;margin:0 !important;padding:0 !important;border-top:0 !important;gap:10px;}
+@media (max-width:640px){#dash-topbar > div:last-child{flex:1 1 100%;}}
+body.dark-mode #dash-topbar{background:#111827 !important;border-color:#1e2d45;}
+
+/* ── Header ── */
+#dash-tracker-hdr{margin-bottom:12px !important;}
+#dash-tracker-hdr > div:first-child > div:first-child{border-radius:12px !important;box-shadow:0 6px 14px -6px rgba(193,68,14,.55);}
+#dash-export-btns button{box-shadow:0 1px 2px rgba(15,23,42,.12) !important;transition:transform .15s,box-shadow .15s;}
+#dash-export-btns button:hover{transform:translateY(-1px);box-shadow:0 6px 12px -6px rgba(15,23,42,.4) !important;}
+body.dark-mode #dash-tracker-hdr > div:first-child > div:last-child > div:first-child{color:#f1f5f9 !important;}
+
+/* ── Segmented tabs, calm panel (replaces the folder tab + thick coloured frame) ── */
+.dash-tab-folder{background:#f8fafc;border:1px solid #e8edf3;border-radius:14px;padding:4px;gap:4px;margin-bottom:12px;}
+.dash-tab-btn{border-radius:11px !important;border:0 !important;margin-bottom:0 !important;padding:10px 12px !important;font-size:13px !important;background:transparent !important;color:#64748b;}
+.dash-tab-btn:hover:not(.is-active){background:rgba(255,255,255,.6) !important;color:#334155;}
+.dash-tab-btn.tab-type-contrib.is-active{background:transparent !important;color:#15803d !important;box-shadow:none !important;}
+.dash-tab-btn.tab-type-expense.is-active{background:transparent !important;color:#b91c1c !important;box-shadow:none !important;}
+.dash-tab-panel{border:1px solid #e8edf3 !important;border-top:3px solid #22c55e !important;border-radius:16px !important;padding:16px !important;box-shadow:0 1px 3px rgba(15,23,42,.05);animation:dshUp .45s cubic-bezier(.2,.8,.2,1) both;}
+.dash-tab-panel.tab-type-expense{border-top-color:#ef4444 !important;}
+@keyframes dshUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+body.dark-mode .dash-tab-folder{background:#0f1a2b;}
+body.dark-mode .dash-tab-btn{color:#94a3b8;}
+body.dark-mode .dash-tab-btn.is-active{background:transparent !important;}
+body.dark-mode .dash-tab-panel{border-color:#1e2d45 !important;}
+
+/* ── Filters: the everyday ones always visible, the rest under "More filters" ── */
+.ct-pf-panel{display:grid !important;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px 12px;align-items:end;
+  border:1px solid #e8edf3 !important;border-radius:16px !important;background:#f8fafc !important;padding:12px 14px !important;margin-bottom:12px !important;}
+.ct-pf-panel > .ct-pf-header,.ct-pf-panel > .ct-tags,.ct-pf-panel > div[style*="flex"]{grid-column:1 / -1;}
+.ct-pf-g5,.ct-pf-g6{display:contents !important;}
+.ct-pf-header{cursor:pointer;margin:0 !important;user-select:none;}
+.ct-pf-title{font-size:13px !important;}
+.ct-pf-lbl{display:block;font-size:10.5px !important;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#64748b;margin-bottom:4px;}
+.ct-pf-sel,.ct-pf-inp{height:38px;box-sizing:border-box;border-radius:10px !important;width:100%;}
+.ct-pf-sel:focus,.ct-pf-inp:focus{outline:none;border-color:#C1440E !important;box-shadow:0 0 0 3px rgba(193,68,14,.15);}
+/* header hint becomes the "More filters" toggle */
+.ct-pf-header .ct-pf-hint{font-size:0 !important;display:flex;align-items:center;}
+.ct-pf-header .ct-pf-hint::before{content:"More filters";font-size:11.5px;font-weight:600;color:#C1440E;padding:5px 12px;border-radius:999px;background:rgba(193,68,14,.08);}
+.ct-pf-header .ct-pf-hint::after{content:"▾";font-size:12px;color:#C1440E;margin-left:6px;transition:transform .2s;}
+.ct-pf-panel.pf-open .ct-pf-hint::before{content:"Fewer filters";}
+.ct-pf-panel.pf-open .ct-pf-hint::after{transform:rotate(180deg);}
+/* secondary filters hidden until opened */
+.ct-pf-panel:not(.pf-open) :is(.ct-pf-g5,.ct-pf-g6) > div:has(:is(#ct_filterTrackID,#ct_filterType,#ct_filterOccasion,#ct_filterMemberType,#ct_filterAmtMin,#et_filterAmtMin)){display:none !important;}
+/* Filter / Clear buttons */
+.ct-pf-panel button[onclick*="ApplyFilter"],.ct-pf-panel button[onclick*="applyFilter"],.ct-pf-panel button[onclick*="learFilter"]{height:38px;border-radius:10px !important;padding:0 16px !important;font-size:12px !important;font-weight:700 !important;}
+.ct-pf-panel .ct-amt-range{display:flex;align-items:center;gap:6px;}
+@media (max-width:900px){.ct-pf-panel{grid-template-columns:repeat(2,minmax(0,1fr));}}
+@media (max-width:420px){.ct-pf-header .ct-pf-hint::before{padding:4px 10px;}}
+body.dark-mode .ct-pf-panel{background:#0f1a2b !important;border-color:#1e2d45 !important;}
+body.dark-mode .ct-pf-title{color:#93c5fd !important;}
+body.dark-mode .ct-pf-lbl{color:#94a3b8;}
+
+/* ── Summary tiles: same language as Home KPI cards ── */
+.ct-sum6{gap:12px !important;}
+.ct-scard{border-radius:14px !important;padding:12px 14px !important;box-shadow:0 1px 2px rgba(15,23,42,.05);transition:transform .2s cubic-bezier(.2,.8,.2,1),box-shadow .2s;}
+.ct-scard:hover{transform:translateY(-2px);box-shadow:0 10px 22px -12px rgba(15,23,42,.35);}
+.ct-scard .sc-lbl{font-size:10px !important;letter-spacing:.07em;}
+.ct-scard .sc-val{font-size:1.35rem !important;font-variant-numeric:tabular-nums;}
+body.dark-mode .ct-scard{background:#111827 !important;}
+
+/* ── Member cards + grid panels: no heavy frame ── */
+.ct-view-panel{border:0 !important;padding:0 !important;background:transparent !important;box-shadow:none !important;}
+#ct_cardsBody > div{border-radius:14px !important;box-shadow:0 1px 2px rgba(15,23,42,.05);transition:transform .2s cubic-bezier(.2,.8,.2,1),box-shadow .2s;animation:dshUp .4s cubic-bezier(.2,.8,.2,1) both;}
+#ct_cardsBody > div:hover{transform:translateY(-3px);box-shadow:0 12px 24px -14px rgba(15,23,42,.4);}
+body.dark-mode #ct_cardsBody > div{background:#111827 !important;border-color:#1e2d45 !important;}
+body.dark-mode #ct_cardsBody > div > div{color:inherit;}
+#ct_view_grid .card-v2{border-radius:14px;}
+
+/* ── Table: compact, fits, soft ── */
+.ct-tbl-wrap{border:1px solid #e8edf3;border-radius:12px;}
+.ct-tbl{min-width:0 !important;font-size:11.5px;}
+.ct-tbl th{padding:9px 7px !important;white-space:nowrap;}
+.ct-tbl td{padding:8px 7px !important;}
+.ct-tbl tbody tr{transition:background .12s;}
+body.dark-mode .ct-tbl-wrap{border-color:#1e2d45;}
+@media (max-width:768px){.ct-tbl{min-width:760px !important;}}
+
+/* ── View switch (Table / Cards / Grid) as calm segmented control ── */
+.ct-view-bar{margin:10px 0 !important;}
+
+/* ── Phone ── */
+@media (max-width:768px){
+  #dash-export-btns{width:100%;}
+  #dash-export-btns button{flex:1;justify-content:center;}
+  .dash-tab-panel{padding:12px !important;}
+}
+@media (prefers-reduced-motion:reduce){.dash-tab-panel{animation:none !important;}}
+
+/* ── fixes after review ── */
+#dash-topbar > div:last-child{min-width:0;box-sizing:border-box;max-width:100%;}
+@media (max-width:640px){#dash-topbar > div:last-child{width:100%;}}
+.ct-sort-row label,.ct-sort-row span{white-space:nowrap;}
+/* dark mode: keep tabs calm (older dark rules re-added the outlined pill) */
+body.dark-mode .dash-tab-btn,body.dark-mode .dash-tab-btn.is-active,body.dark-mode .dash-tab-btn.tab-type-contrib.is-active,body.dark-mode .dash-tab-btn.tab-type-expense.is-active{border:0 !important;border-radius:11px !important;}
+body.dark-mode .dash-tab-btn.tab-type-contrib.is-active{color:#4ade80 !important;box-shadow:none !important;}
+body.dark-mode .dash-tab-btn.tab-type-expense.is-active{color:#f87171 !important;box-shadow:none !important;}
+
+/* ── wave outline: the segmented Contributions/Expenses switch has its own highlight, so no extra outline;
+      elsewhere the animated outline is kept but made lighter ── */
+.wave-stroke{stroke-width:1.5px;opacity:.8;}
+body.dark-mode #ct_cardsBody > div > div:nth-child(2){color:#f1f5f9 !important;}
+
+/* Filter / Clear sit side by side under the last two fields */
+.ct-pf-panel > button[onclick*="applyFilter"],.ct-pf-panel > button[onclick*="ApplyFilter"],.ct-pf-g6 > button[onclick*="applyFilter"]{grid-column:3;}
+.ct-pf-g6 > button[onclick*="clearFilter"]{grid-column:4;}
+@media (max-width:900px){.ct-pf-g6 > button[onclick*="applyFilter"]{grid-column:1;}.ct-pf-g6 > button[onclick*="clearFilter"]{grid-column:2;}}
+
+.ct-sort-row{display:flex !important;align-items:center;gap:8px;white-space:nowrap;}
+.ct-sort-row .ct-sort-sel{min-width:170px;}
+/* soft entrance for the summary tiles */
+.dash-tab-panel .ct-scard{animation:dshUp .45s cubic-bezier(.2,.8,.2,1) both;}
+.dash-tab-panel .ct-scard:nth-child(2){animation-delay:.05s}.dash-tab-panel .ct-scard:nth-child(3){animation-delay:.1s}
+.dash-tab-panel .ct-scard:nth-child(4){animation-delay:.15s}.dash-tab-panel .ct-scard:nth-child(5){animation-delay:.2s}.dash-tab-panel .ct-scard:nth-child(6){animation-delay:.25s}
+@media (prefers-reduced-motion:reduce){.ct-scard,#ct_cardsBody > div{animation:none !important;transition:none !important;}}
+.ct-pf-panel .ct-amt-range input{flex:1;min-width:0;width:auto !important;}

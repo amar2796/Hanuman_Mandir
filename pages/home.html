@@ -47,7 +47,7 @@
         <!-- ── KPI Row: 4 stat cards ── (moved above the all-time summary: this is
              the "what needs my attention today" data, so it should be seen first)
              PREVIEW: modernized stat-card-v2 styling with sparkline slot. -->
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:18px;">
+        <div class="hm-kpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:18px;">
 
           <!-- Month Collection -->
           <div class="stat-card-v2" style="--accent:#27ae60;">
@@ -98,9 +98,9 @@
 
         </div>
 
-        <!-- ── Two-column: Member Status + Walk-in ── -->
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
-
+        <!-- ── Two columns (stacked cards, no stretching): left = status + alerts, right = actions + counter ── -->
+        <div class="hm-split">
+          <div class="hm-col">
           <!-- Member Contribution Status -->
           <div class="card" style="margin-bottom:0;padding:16px 18px;">
             <h3 style="margin-bottom:10px;font-size:13px;">
@@ -124,6 +124,31 @@
             </div>
           </div>
 
+          <!-- Smart Alerts -->
+          <div class="card" style="margin-bottom:0;padding:16px 18px;">
+            <h3 style="margin-bottom:12px;font-size:13px;"><i class="fa-solid fa-bell"></i> Smart Alerts <span id="hm_alert_badge" style="background:#fef2f2;color:#e74c3c;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;border:1px solid #fca5a5;"></span></h3>
+            <div id="hm_alerts_list">
+              <div style="text-align:center;padding:20px;color:#94a3b8;font-size:12px;"><i class="fa-solid fa-spinner fa-spin"></i> Checking...</div>
+            </div>
+          </div>
+          </div>
+          <div class="hm-col">
+          <!-- Quick Actions -->
+          <div class="card" style="margin-bottom:0;padding:16px 18px;">
+            <h3 style="margin-bottom:12px;font-size:13px;"><i class="fa-solid fa-bolt"></i> Quick Actions</h3>
+            <div class="hm-qa" style="display:flex;flex-direction:column;gap:7px;">
+              <button onclick="_quickNav('contributionPage','[onclick*=contributionPage]')" style="background:#27ae60;text-align:left;padding:9px 14px;font-size:12px;display:flex;align-items:center;gap:8px;box-shadow:none;"><i class="fa-solid fa-plus"></i> Add Contribution</button>
+              <button onclick="_quickNav('expensePage','[onclick*=expensePage]')" style="background:#e74c3c;text-align:left;padding:9px 14px;font-size:12px;display:flex;align-items:center;gap:8px;box-shadow:none;"><i class="fa-solid fa-receipt"></i> Add Expense</button>
+              <button onclick="_quickNav('trackerPage','[onclick*=trackerPage]')" style="background:#334155;text-align:left;padding:9px 14px;font-size:12px;display:flex;align-items:center;gap:8px;box-shadow:none;"><i class="fa-solid fa-chart-line"></i> Tracker / Reminders</button>
+              <button onclick="openDashboard(document.querySelector('[onclick*=openDashboard]'))" style="background:#C1440E;text-align:left;padding:9px 14px;font-size:12px;display:flex;align-items:center;gap:8px;box-shadow:none;"><i class="fa-solid fa-chart-pie"></i> Full Dashboard & Reports</button>
+            </div>
+            <!-- Last Backup status -->
+            <div id="hm_backup_row" style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:10px;border-top:1px solid #f1f5f9;">
+              <div id="hm_backup_status" style="font-size:11px;color:#94a3b8;"><i class="fa-solid fa-spinner fa-spin"></i> Checking backup…</div>
+              <button onclick="downloadLocalBackup()" style="background:#C1440E;font-size:10px;padding:4px 10px;box-shadow:none;flex-shrink:0;">Back up now</button>
+            </div>
+          </div>
+
           <!-- Walk-in Entries -->
           <div class="card" style="margin-bottom:0;padding:16px 18px;">
             <h3 style="margin-bottom:12px;font-size:13px;">
@@ -139,39 +164,7 @@
               <button onclick="showPage('contributionPage',document.querySelector('[onclick*=contributionPage]'))" style="background:#f59e0b;font-size:11px;padding:5px 12px;box-shadow:none;color:#fff;">+ Add Counter Entry</button>
             </div>
           </div>
-
-        </div>
-
-        <!-- ── Two-column: Smart Alerts + Quick Actions ── (split out of the old
-             3-col row so both cards match height naturally — the chart used to
-             sit here and forced this row to grow/scroll unevenly against these
-             two short cards) -->
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
-
-          <!-- Smart Alerts -->
-          <div class="card" style="margin-bottom:0;padding:16px 18px;">
-            <h3 style="margin-bottom:12px;font-size:13px;"><i class="fa-solid fa-bell"></i> Smart Alerts <span id="hm_alert_badge" style="background:#fef2f2;color:#e74c3c;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;border:1px solid #fca5a5;"></span></h3>
-            <div id="hm_alerts_list">
-              <div style="text-align:center;padding:20px;color:#94a3b8;font-size:12px;"><i class="fa-solid fa-spinner fa-spin"></i> Checking...</div>
-            </div>
           </div>
-
-          <!-- Quick Actions -->
-          <div class="card" style="margin-bottom:0;padding:16px 18px;">
-            <h3 style="margin-bottom:12px;font-size:13px;"><i class="fa-solid fa-bolt"></i> Quick Actions</h3>
-            <div style="display:flex;flex-direction:column;gap:7px;">
-              <button onclick="_quickNav('contributionPage','[onclick*=contributionPage]')" style="background:#27ae60;text-align:left;padding:9px 14px;font-size:12px;display:flex;align-items:center;gap:8px;box-shadow:none;"><i class="fa-solid fa-plus"></i> Add Contribution</button>
-              <button onclick="_quickNav('expensePage','[onclick*=expensePage]')" style="background:#e74c3c;text-align:left;padding:9px 14px;font-size:12px;display:flex;align-items:center;gap:8px;box-shadow:none;"><i class="fa-solid fa-receipt"></i> Add Expense</button>
-              <button onclick="_quickNav('trackerPage','[onclick*=trackerPage]')" style="background:#334155;text-align:left;padding:9px 14px;font-size:12px;display:flex;align-items:center;gap:8px;box-shadow:none;"><i class="fa-solid fa-chart-line"></i> Tracker / Reminders</button>
-              <button onclick="openDashboard(document.querySelector('[onclick*=openDashboard]'))" style="background:#C1440E;text-align:left;padding:9px 14px;font-size:12px;display:flex;align-items:center;gap:8px;box-shadow:none;"><i class="fa-solid fa-chart-pie"></i> Full Dashboard & Reports</button>
-            </div>
-            <!-- Last Backup status -->
-            <div id="hm_backup_row" style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:10px;border-top:1px solid #f1f5f9;">
-              <div id="hm_backup_status" style="font-size:11px;color:#94a3b8;"><i class="fa-solid fa-spinner fa-spin"></i> Checking backup…</div>
-              <button onclick="downloadLocalBackup()" style="background:#C1440E;font-size:10px;padding:4px 10px;box-shadow:none;flex-shrink:0;">Back up now</button>
-            </div>
-          </div>
-
         </div>
 
         <!-- Occasion Breakdown — this month's collection split by occasion -->

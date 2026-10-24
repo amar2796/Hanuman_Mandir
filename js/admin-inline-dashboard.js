@@ -446,7 +446,7 @@ var dash_contributions = [];
       const label  = _dash_activeTab === "contrib" ? "CONTRIBUTION" : "EXPENSE";
 
       doc.setFillColor(51,65,85); doc.rect(0,0,w,22,"F");
-      doc.setTextColor(15, 118, 110); doc.setFontSize(14); doc.setFont(undefined,"bold");
+      doc.setTextColor(251, 191, 36); doc.setFontSize(14); doc.setFont(undefined,"bold");
       doc.text(`${APP.name.toUpperCase()} — ${label} REPORT ${period}`, w/2, 13, {align:"center"});
 
       let rows = [];

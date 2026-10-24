@@ -16,7 +16,14 @@
         </div>
 
         <!-- Filters -->
-        <div class="card-v2">
+        <div class="card-v2 db-filter-card" id="db_filterCard">
+          <div class="db-head">
+            <div class="db-head-title"><i class="fa-solid fa-sliders" style="color:#C1440E;"></i> Filters <span class="db-active" id="db_activeCount"></span></div>
+            <div class="db-head-actions">
+              <button type="button" class="pf-clear" onclick="dbClear()"><i class="fa-solid fa-rotate-left"></i> Clear All</button>
+              <button type="button" class="db-more" id="db_moreBtn" onclick="dbToggleMore()" aria-expanded="false"><span class="db-more-t">More filters</span> <i class="fa-solid fa-chevron-down"></i></button>
+            </div>
+          </div>
           <div class="db-quick" id="db_quick">
             <button type="button" class="db-chip" data-q="today"     onclick="dbQuick('today',this)">Today</button>
             <button type="button" class="db-chip" data-q="week"      onclick="dbQuick('week',this)">This week</button>
@@ -26,28 +33,28 @@
             <button type="button" class="db-chip" data-q="all"       onclick="dbQuick('all',this)">All time</button>
           </div>
           <div class="db-filters">
-            <label>From <input type="date" id="db_from" onchange="dbCustomDate()"></label>
-            <label>To <input type="date" id="db_to" onchange="dbCustomDate()"></label>
-            <label>Show
+            <label class="db-q">From <input type="date" id="db_from" onchange="dbCustomDate()"></label>
+            <label class="db-q">To <input type="date" id="db_to" onchange="dbCustomDate()"></label>
+            <label class="db-q db-q-search">Search <input class="search-bar db-search" id="db_search" placeholder="Name, receipt no, title…" oninput="dbSearchDebounced()"></label>
+            <label class="db-more-f">Show
               <select id="db_kind" onchange="dbRender(true)">
                 <option value="all">Receipts &amp; Expenses</option>
                 <option value="in">Receipts only</option>
                 <option value="out">Expenses only</option>
               </select>
             </label>
-            <label>Group by
+            <label class="db-more-f">Group by
               <select id="db_basis" onchange="dbRender(true)" title="Period = the entry's Month and Year. Entry date = the day it was typed in.">
                 <option value="period">Period (Month/Year)</option>
                 <option value="entry">Entry date</option>
               </select>
             </label>
-            <label>Order
+            <label class="db-more-f">Order
               <select id="db_order" onchange="dbRender(true)">
                 <option value="desc">Newest first</option>
                 <option value="asc">Oldest first</option>
               </select>
             </label>
-            <input class="search-bar db-search" id="db_search" placeholder="🔍 Search name, receipt no, title…" oninput="dbSearchDebounced()">
           </div>
         </div>
 

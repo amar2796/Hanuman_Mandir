@@ -1,0 +1,103 @@
+/* ════════════════════════════════════════════════════════════
+   admin-polish.css — UI-ONLY polish (no logic). Loaded last.
+   Tighter gaps, calmer sidebar, premium cards/tables, phone fixes.
+   Colour palette unchanged (saffron #C1440E, navy, green).
+   ════════════════════════════════════════════════════════════ */
+
+/* ── 1. No space reserved for hidden bulk bar; tighter rhythm ── */
+.bulk-bar-v2:not(.visible){display:none !important;}
+.bulk-bar-v2{margin-bottom:8px;padding:8px 12px;}
+.sel-row{margin:0 0 6px !important;}
+.filter-v2{margin-bottom:12px;}
+.page .card{border-radius:14px;}
+.page .card > h3{margin-bottom:10px;}
+.sp-action-bar{padding:12px 16px !important;margin-bottom:12px !important;border-radius:14px;}
+.sp-action-bar-title{font-size:15px;}
+.sp-action-btn{padding:8px 14px !important;border-radius:9px !important;font-size:12.5px !important;box-shadow:0 1px 2px rgba(15,23,42,.12);transition:transform .15s,box-shadow .15s;}
+.sp-action-btn:hover{transform:translateY(-1px);box-shadow:0 4px 10px rgba(15,23,42,.18);}
+
+/* ── 2. Tables: compact, softer rows ── */
+.table-v2-wrap{border-radius:12px;border:1px solid #e8edf3;box-shadow:0 1px 3px rgba(15,23,42,.05);}
+.table-v2 thead th{padding:10px 12px;font-size:10.5px;letter-spacing:.06em;}
+.table-v2 tbody td{padding:9px 12px;}
+.table-v2 tbody tr{transition:background .12s;}
+.table-v2 tbody tr:hover{background:rgba(193,68,14,.045);}
+body.dark-mode .table-v2-wrap{border-color:#243247;box-shadow:none;}
+body.dark-mode .table-v2 tbody tr:hover{background:rgba(224,152,122,.08);}
+
+/* ── 3. Sidebar: calm — only the active item carries colour ── */
+.sidebar .nav-finance,.sidebar .nav-members,.sidebar .nav-content,.sidebar .nav-system{color:#cbd5e1;}
+.sidebar .nav-finance:hover:not(.active-nav),.sidebar .nav-members:hover:not(.active-nav),
+.sidebar .nav-content:hover:not(.active-nav),.sidebar .nav-system:hover:not(.active-nav){color:#fff !important;}
+.sidebar .nav-section-label{opacity:.7;}
+.sidebar li:not(.nav-section-label){padding-top:9px;padding-bottom:9px;}
+
+/* ── 4. Header: slimmer ── */
+.header{padding-top:8px;padding-bottom:8px;}
+
+/* ── 5. Phone ── */
+@media (max-width:768px){
+  .page{padding-left:10px !important;padding-right:10px !important;padding-top:8px !important;}
+  .page .card{padding:12px !important;margin-bottom:10px !important;}
+  .page .card > h3{font-size:14px;gap:6px !important;}
+  .page .card > h3 > span > span{display:block;margin-top:2px;}      /* hint text on its own line */
+  /* heavy full-width Export CSV bar → compact pill on the right */
+  .page .card > h3 > button[onclick^="export"]{width:auto !important;padding:6px 12px !important;font-size:11.5px !important;border-radius:999px !important;margin-left:auto;}
+  .sp-action-bar{padding:10px 12px !important;gap:8px !important;}
+  .sp-action-btns{display:grid !important;grid-template-columns:1fr 1fr;gap:8px !important;width:100%;}
+  .sp-action-btn{justify-content:center;padding:9px 8px !important;font-size:12px !important;}
+  .sp-action-btns .sp-action-btn:last-child:nth-child(odd){grid-column:1 / -1;}
+  /* header: hide the search box text crowding, keep icons tidy */
+  .header{padding:6px 10px !important;gap:6px !important;}
+  #cmdkTriggerV2{width:36px;padding:0 !important;justify-content:center;}
+  #cmdkTriggerV2 span,#cmdkTriggerV2 kbd{display:none !important;}
+  .table-v2 thead th{padding:8px 8px;font-size:10px;}
+  .table-v2 tbody td{padding:8px;font-size:12.5px;}
+  /* content must clear the floating bottom bar */
+  .page{padding-bottom:calc(96px + env(safe-area-inset-bottom)) !important;}
+}
+
+/* ── 6. Dark-mode fixes (white leftovers + unreadable labels) ── */
+body.dark-mode .filter-v2{border-color:#243247;background:#0f1a2b;}
+body.dark-mode .filter-v2-head{background:#0f1a2b !important;color:#e2e8f0;}
+body.dark-mode .filter-v2-head span{color:#e2e8f0;}
+body.dark-mode #cmdkTriggerV2{background:#111c2e !important;border-color:#243247 !important;color:#94a3b8 !important;}
+body.dark-mode #cmdkTriggerV2 kbd{background:transparent;border-color:#334155 !important;color:#64748b !important;}
+body.dark-mode .nav-section-label{color:#7c8aa0 !important;}
+
+/* ── 7. Export CSV pill (all list pages) ── */
+@media (max-width:768px){
+  #contributionPage .card h3 > button,#expensePage .card h3 > button,#usersPage .card h3 > button{width:auto !important;align-self:flex-start !important;padding:6px 14px !important;font-size:11.5px !important;border-radius:999px !important;}
+  #contributionPage .card h3,#expensePage .card h3{gap:6px !important;}
+}
+
+/* ── 8. .card-v2 (Expense, Year Summary…) had no dark-mode rule → white slab ── */
+body.dark-mode .card-v2{background:#111827 !important;border-color:#1e2d45 !important;color:#e2e8f0 !important;box-shadow:0 4px 24px rgba(0,0,0,.4) !important;}
+body.dark-mode .card-v2 h3,body.dark-mode .card-v2 h2,body.dark-mode .card-v2 .card-v2-title{color:#f1f5f9 !important;}
+body.dark-mode .card-v2 .filter-v2{background:#0f1a2b;}
+.card-v2{border-radius:14px;}
+
+.list-count-line{font-size:12.5px !important;font-weight:500 !important;color:#64748b !important;margin:2px 0 6px !important;line-height:1.3 !important;}
+.list-count-line b{color:#1e293b !important;font-weight:700 !important;}
+body.dark-mode .list-count-line{color:#94a3b8 !important;}
+body.dark-mode .list-count-line b{color:#f1f5f9 !important;}
+
+/* ── 9. Sidebar Events item joins the calm palette ── */
+.sidebar .nav-event{color:#cbd5e1;}
+.sidebar .nav-event:hover:not(.active-nav){color:#fff !important;}
+
+/* ── 10. Day Book filter bar: one height, one baseline ── */
+.db-filters{gap:10px 12px;align-items:flex-end;}
+.db-filters input[type=date],.db-filters select,.db-filters input.db-search{height:40px;box-sizing:border-box;margin:0 !important;border-radius:10px;}
+.db-filters input.db-search{align-self:flex-end;padding:0 12px;}
+@media (max-width:768px){
+  .db-filters label{flex:1 1 calc(50% - 8px);min-width:0;}
+  .db-filters input[type=date],.db-filters select{width:100%;}
+  .db-filters input.db-search{flex:1 1 100%;}
+}
+
+/* ── 11. Day Book month header: compact, left, calm ── */
+.db-table tr.db-day td{padding:6px 12px !important;font-size:11.5px;text-align:left !important;font-style:normal !important;color:#64748b;letter-spacing:.02em;}
+.db-table tr.db-day td.db-num{text-align:right !important;}
+.db-table tr.db-day td.db-num{text-align:right;}
+body.dark-mode .db-table tr.db-day td{color:#94a3b8;}

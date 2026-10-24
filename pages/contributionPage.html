@@ -30,24 +30,12 @@
             </button>
           </h3>
           <!-- PREVIEW: collapsible filter panel (was always-open) -->
-          <div class="filter-v2" id="cr_filterV2">
-            <div class="filter-v2-head" onclick="document.getElementById('cr_filterV2').classList.toggle('open')">
-              <i class="fa-solid fa-sliders" style="color:#C1440E;"></i>
-              <span style="font-weight:600;">Filters</span>
-              <span class="chip" id="cr_filterCount" style="display:none;">0 active</span>
-              <i class="fa-solid fa-chevron-down caret"></i>
-            </div>
+          <div class="filter-v2 open pf-always" id="cr_filterV2">
             <div class="filter-v2-body">
           <div class="ct-pf-panel" style="margin-bottom:14px;border:none;padding:0;">
             <div class="ct-pf-header">
-              <div class="ct-pf-title">
-              </div>
-              <div style="display:flex;align-items:center;gap:10px;">
-                <span class="ct-pf-hint">All filters combine together</span>
-                <button onclick="clearContribFilters()" style="background:transparent;border:1.5px solid #e2e8f0;color:#64748b;border-radius:7px;padding:5px 12px;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap;box-shadow:none;display:flex;align-items:center;gap:5px;line-height:1;transition:border-color .2s,color .2s;" onmouseover="this.style.borderColor='#C1440E';this.style.color='#C1440E';" onmouseout="this.style.borderColor='#e2e8f0';this.style.color='#64748b';">
-                  <i class="fa-solid fa-rotate-left" style="font-size:10px;"></i> Clear All
-                </button>
-              </div>
+              <div class="ct-pf-title"><i class="fa-solid fa-sliders" style="color:#C1440E;"></i> Filters <span class="chip" id="cr_filterCount" style="display:none;">0 active</span></div>
+              <div class="ct-pf-actions"><button type="button" class="pf-clear" onclick="clearContribFilters()"><i class="fa-solid fa-rotate-left"></i> Clear All</button><div class="ct-pf-hint">All filters combine together</div></div>
             </div>
             <div class="ct-pf-g5" style="margin-bottom:8px;">
               <div>

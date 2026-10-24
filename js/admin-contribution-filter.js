@@ -184,7 +184,7 @@ var _ct_filtered   = [];   // filtered contribution rows (with pending injected)
       _setTxt("ct_avgMember", "₹" + fmt(avgPerMember));
       _setTxt("ct_highMonth", highEntry ? highEntry[0].slice(0,3) : "—");
       _setTxt("ct_highMonthAmt", highEntry ? "₹" + fmt(highEntry[1]) : "");
-      _setTxt("ct_filterCount", _ct_filtered.length + " records");
+      _setTxt("ct_filterCount", _ct_filtered.length + (_ct_filtered.length === 1 ? " record" : " records"));
     }
 
     function ct_renderActiveTags(fYear, fMonth, fName, fTrack, fType, fOcc, fKind, fStatus, fAmtMin, fAmtMax) {
@@ -403,8 +403,18 @@ var _ct_filtered   = [];   // filtered contribution rows (with pending injected)
       if (!tbl) return;
       const fYear = document.getElementById("ct_filterYear")?.value;
       const yr = fYear ? Number(fYear) : dash_selectedYear;
-      const members = dash_users.filter(u => String(u.Status||"active").toLowerCase() !== "inactive");
-      if (!members.length) { tbl.innerHTML = '<tr><td style="color:#aaa;padding:16px;">No members found.</td></tr>'; return; }
+      let members = dash_users.filter(u => String(u.Status||"active").toLowerCase() !== "inactive");
+      // The Name / Type / Status / Amount / Tracking / Occasion / Member-type / Month filters also apply here:
+      // when any is set, only the matching members and payments are shown (before, only Year was honoured).
+      const _gridFiltered = ["ct_filterMonth","ct_filterName","ct_filterTrackID","ct_filterType","ct_filterOccasion","ct_filterMemberType","ct_filterStatus","ct_filterAmtMin","ct_filterAmtMax"]
+        .some(id => { const el = document.getElementById(id); return el && String(el.value || "").trim() !== ""; });
+      let _gridPaid = null;
+      if (_gridFiltered) {
+        _gridPaid = _ct_filtered.filter(r => r._type === "paid").map(r => r._data);
+        const keep = new Set(_ct_filtered.map(r => String(r._type === "paid" ? r._data.UserId : r._data.UserId)));
+        members = members.filter(u => keep.has(String(u.UserId)));
+      }
+      if (!members.length) { tbl.innerHTML = '<tr><td style="color:#aaa;padding:16px;">' + (_gridFiltered ? "No members match the filters." : "No members found.") + '</td></tr>'; return; }
 
       let hdr = '<thead><tr><th style="min-width:130px;">Member</th>';
       _dash_months.forEach(m => { hdr += `<th style="min-width:60px;text-align:center;">${m.slice(0,3)}</th>`; });
@@ -414,7 +424,7 @@ var _ct_filtered   = [];   // filtered contribution rows (with pending injected)
         let total = 0;
         let cells = _dash_months.map(m => {
           // Use filter+reduce to sum ALL contributions for this member+month (handles multiple payments same month)
-          const contribs = dash_contributions.filter(c =>
+          const contribs = (_gridPaid || dash_contributions).filter(c =>
             String(c.UserId) === String(u.UserId) && Number(c.Year) === yr && (c.ForMonth||"") === m
           );
           if (contribs.length > 0) {

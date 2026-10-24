@@ -24,17 +24,12 @@
             </button>
           </h3>
           <!-- PREVIEW: collapsible filter panel -->
-          <div class="filter-v2" id="exp_filterV2">
-            <div class="filter-v2-head" onclick="document.getElementById('exp_filterV2').classList.toggle('open')">
-              <i class="fa-solid fa-sliders" style="color:#e74c3c;"></i>
-              <span style="font-weight:600;">Filters</span>
-              <i class="fa-solid fa-chevron-down caret"></i>
-            </div>
+          <div class="filter-v2 open pf-always" id="exp_filterV2">
             <div class="filter-v2-body">
           <div class="ct-pf-panel" style="margin-bottom:14px;border:none;padding:0;">
             <div class="ct-pf-header">
-              <div class="ct-pf-title"><span id="exp_filterCount"></span></div>
-              <div class="ct-pf-hint">All filters combine together</div>
+              <div class="ct-pf-title"><i class="fa-solid fa-sliders" style="color:#e74c3c;"></i> Filters <span id="exp_filterCount"></span></div>
+              <div class="ct-pf-actions"><button type="button" class="pf-clear" onclick="clearExpenseFilters()"><i class="fa-solid fa-rotate-left"></i> Clear All</button><div class="ct-pf-hint">All filters combine together</div></div>
             </div>
             <div class="ct-pf-g5" style="margin-bottom:8px;">
               <div>
@@ -70,11 +65,6 @@
                   <input class="ct-pf-inp" id="expFilterAmtMax" placeholder="₹ Max" type="number" min="0" oninput="_filterExpensesDebounced()" style="margin:0;" />
                 </div>
               </div>
-            </div>
-            <div style="display:flex;justify-content:flex-end;">
-              <button onclick="clearExpenseFilters()" style="background:transparent;border:1px solid #cbd5e1;color:#475569;border-radius:8px;padding:8px 14px;font-size:11px;font-weight:600;cursor:pointer;height:34px;white-space:nowrap;box-shadow:none;">
-                <i class="fa-solid fa-circle-xmark"></i> Clear All
-              </button>
             </div>
             <!-- Active filter tags -->
             <div class="ct-tags" id="exp_activeTags" style="margin-top:8px;"></div>

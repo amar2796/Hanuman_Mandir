@@ -144,6 +144,18 @@
   var _t = null;
   window.dbSearchDebounced = function () { clearTimeout(_t); _t = setTimeout(function () { window.dbRender(true); }, 250); };
 
+  /* Clear All = back to the default view: this month, receipts & expenses, newest first, no search */
+  window.dbClear = function () {
+    $("db_kind").value = "all"; $("db_basis").value = "period"; $("db_order").value = "desc"; $("db_search").value = "";
+    var chip = document.querySelector('#db_quick .db-chip[data-q="month"]');
+    window.dbQuick("month", chip);
+  };
+  window.dbToggleMore = function () {
+    var c = $("db_filterCard"); if (!c) return;
+    var open = c.classList.toggle("db-open");
+    var b = $("db_moreBtn"); if (b) { b.setAttribute("aria-expanded", open ? "true" : "false"); var t = b.querySelector(".db-more-t"); if (t) t.textContent = open ? "Fewer filters" : "More filters"; }
+  };
+
   /* ── compute + draw ── */
   window.dbRender = function (resetPage) {
     if (!$("db_body")) return;
@@ -263,7 +275,7 @@
     var doc = new window.jspdf.jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
     var W = doc.internal.pageSize.getWidth(), M = 12;
     doc.setFillColor(30, 41, 64); doc.rect(0, 0, W, 24, "F");
-    doc.setTextColor(15, 118, 110); doc.setFontSize(14); doc.setFont(undefined, "bold");
+    doc.setTextColor(251, 191, 36); doc.setFontSize(14); doc.setFont(undefined, "bold");
     doc.text(((window.APP && APP.name) || "Mandir").toUpperCase(), W / 2, 10, { align: "center" });
     doc.setTextColor(148, 163, 184); doc.setFontSize(9); doc.setFont(undefined, "normal");
     doc.text("Day Book  |  " + (st.from ? dmy(st.from) : "Start") + " to " + (st.to ? dmy(st.to) : "Latest") + (st.filtered ? "  (filtered)" : ""), W / 2, 17, { align: "center" });
@@ -277,7 +289,7 @@
       body: [["", "Opening Balance", "", "", "", "", "", pdfMoney(st.opening)]].concat(rows),
       foot: [["", "Total", "", "", "", pdfMoney(st.totals.in), pdfMoney(st.totals.out), pdfMoney(st.closing)]],
       startY: 28, margin: { left: M, right: M },
-      headStyles: { fillColor: [30, 41, 64], textColor: [15, 118, 110], fontSize: 8 },
+      headStyles: { fillColor: [30, 41, 64], textColor: [251, 191, 36], fontSize: 8 },
       footStyles: { fillColor: [241, 245, 249], textColor: [30, 41, 64], fontStyle: "bold", fontSize: 8 },
       styles: { fontSize: 7.5, cellPadding: 1.6 }, alternateRowStyles: { fillColor: [250, 248, 243] },
       columnStyles: { 5: { halign: "right" }, 6: { halign: "right" }, 7: { halign: "right" } }

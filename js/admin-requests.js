@@ -430,9 +430,9 @@
       let Y = 18;
       // Header
       doc.setFillColor(30, 41, 64); doc.rect(0, 0, W, 28, "F");
-      doc.setTextColor(15, 118, 110); doc.setFontSize(14); doc.setFont(undefined, "bold");
+      doc.setTextColor(251, 191, 36); doc.setFontSize(14); doc.setFont(undefined, "bold");
       doc.text((typeof APP !== "undefined" ? APP.name : "Mandir").toUpperCase(), W / 2, 12, { align: "center" });
-      doc.setTextColor(148, 163, 184); doc.setFontSize(9); doc.setFont(undefined, "normal");
+      doc.setTextColor(203, 213, 225); doc.setFontSize(9); doc.setFont(undefined, "normal");
       doc.text("Annual Financial Report", W / 2, 20, { align: "center" });
       Y = 36;
       doc.setTextColor(30, 41, 64); doc.setFontSize(11); doc.setFont(undefined, "bold");
@@ -442,7 +442,16 @@
       // the text form from constants.js (APP.currencyText, e.g. "Rs.") instead.
       // Same font limit applies to the typographic minus (−) used for negative balances → plain "-".
       const _pdfCur = (typeof APP !== "undefined" && APP.currencyText) ? APP.currencyText : "Rs.";
-      const _pdfClean = td => td.textContent.trim().replace(/₹\s*/g, _pdfCur + " ").replace(/\u2212/g, "-");
+      // The Year cell also holds the Open/Locked badge and the Lock/Unlock button — their text used to be
+      // glued onto the year ("2023OpenLock"). Drop the buttons and join the remaining pieces with a space.
+      const _cellText = td => {
+        const c = td.cloneNode(true);
+        c.querySelectorAll("button").forEach(b => b.remove());
+        const parts = [], w = document.createTreeWalker(c, NodeFilter.SHOW_TEXT);
+        while (w.nextNode()) { const t = w.currentNode.nodeValue.trim(); if (t) parts.push(t); }
+        return parts.join(" ");
+      };
+      const _pdfClean = td => _cellText(td).replace(/₹\s*/g, _pdfCur + " ").replace(/\u2212/g, "-");
       const rows = Array.from(tbody.querySelectorAll("tr")).map(tr =>
         Array.from(tr.querySelectorAll("td")).map(_pdfClean)
       );
@@ -461,7 +470,7 @@
         for (let c = 1; c < heads.length; c++) _right[c] = { halign: "right" };
         doc.autoTable({
           head: [heads], body: rows, foot: foot, startY: Y, margin: { left: margin, right: margin },
-          headStyles: { fillColor: [30, 41, 64], textColor: [15, 118, 110], fontSize: 7.5 },
+          headStyles: { fillColor: [30, 41, 64], textColor: [251, 191, 36], fontSize: 7.5 },
           bodyStyles: { fontSize: 7.5 }, alternateRowStyles: { fillColor: [250, 248, 243] },
           footStyles: { fillColor: [241, 245, 249], textColor: [30, 41, 64], fontSize: 7.5, fontStyle: "bold" },
           columnStyles: _right

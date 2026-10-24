@@ -21,7 +21,7 @@
 //    name, location/address, receiptPrefix, emailDailyLimit,
 //    signatory, designation, tagline, thankYouMsg, version
 const CFG = {
-  version:       "5.0.0",        // SYNC with APP.version in constants.js
+  version:       "4.0.0",        // SYNC with APP.version in constants.js
   name:          "Shree Hanuman Mandir",
   location:      "Paliya, Sultanpur",
   address:       "Paliya, Sultanpur, Uttar Pradesh",

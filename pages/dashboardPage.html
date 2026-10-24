@@ -54,9 +54,6 @@
           </div>
           <!-- Right: Export buttons -->
           <div id="dash-export-btns" style="display:flex;gap:7px;flex-wrap:wrap;">
-            <button onclick="dash_email()" style="background:#2980b9;box-shadow:none;padding:7px 13px;font-size:11px;font-weight:600;border-radius:8px;display:flex;align-items:center;gap:6px;">
-              <i class="fa-solid fa-envelope"></i> Email
-            </button>
             <button onclick="dash_exportPDF()" style="background:#e74c3c;box-shadow:none;padding:7px 13px;font-size:11px;font-weight:600;border-radius:8px;display:flex;align-items:center;gap:6px;">
               <i class="fa-solid fa-file-pdf"></i> PDF
             </button>
@@ -125,7 +122,7 @@
               Power Filters
               <span style="font-size:10px;font-weight:400;color:#94a3b8;" id="ct_filterCount"></span>
             </div>
-            <div class="ct-pf-hint">All filters combine together</div>
+            <div class="ct-pf-actions"><button type="button" class="pf-clear" onclick="ct_clearFilter()"><i class="fa-solid fa-rotate-left"></i> Clear All</button><div class="ct-pf-hint">All filters combine together</div></div>
           </div>
 
           <div class="ct-pf-g5">
@@ -190,12 +187,6 @@
                 <input class="ct-pf-inp" id="ct_filterAmtMax" placeholder="₹ Max" type="number" min="0" oninput="ct_debounceFilter()" />
               </div>
             </div>
-            <button onclick="ct_applyFilter()" style="background:#C1440E;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:11px;font-weight:600;cursor:pointer;height:34px;align-self:end;white-space:nowrap;">
-              <i class="fa-solid fa-filter"></i> Filter
-            </button>
-            <button onclick="ct_clearFilter()" style="background:transparent;border:1px solid #cbd5e1;color:#475569;border-radius:8px;padding:8px 12px;font-size:11px;font-weight:600;cursor:pointer;height:34px;align-self:end;white-space:nowrap;">
-              Clear All
-            </button>
           </div>
 
           <!-- Active filter tags -->
@@ -224,6 +215,7 @@
               <option value="amount_asc">Amount (Low → High)</option>
               <option value="name_asc">Name A → Z</option>
             </select>
+            <button type="button" class="pf-clear pf-clear-sm" onclick="ct_clearFilter()"><i class="fa-solid fa-rotate-left"></i> Clear All</button>
           </div>
         </div>
 
@@ -329,7 +321,7 @@
                 Power Filters
                 <span style="font-size:10px;font-weight:400;color:#94a3b8;" id="et_filterCount2"></span>
               </div>
-              <div class="ct-pf-hint">All filters combine together</div>
+              <div class="ct-pf-actions"><button type="button" class="pf-clear" onclick="_et_clearFilter()"><i class="fa-solid fa-rotate-left"></i> Clear All</button><div class="ct-pf-hint">All filters combine together</div></div>
             </div>
             <div class="ct-pf-g5">
               <div>
@@ -366,12 +358,6 @@
               </div>
             </div>
             <div style="display:flex;gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap;">
-              <button onclick="_et_applyFilter()" style="background:#ef4444;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap;">
-                <i class="fa-solid fa-filter"></i> Filter
-              </button>
-              <button onclick="_et_clearFilter()" style="background:transparent;border:1px solid #cbd5e1;color:#475569;border-radius:8px;padding:7px 12px;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap;">
-                Clear All
-              </button>
               <div style="display:flex;gap:6px;flex-wrap:wrap;" id="et_activeTags"></div>
             </div>
           </div>
@@ -390,6 +376,7 @@
                 <option value="amount_asc">Amount (Low→High)</option>
                 <option value="title_asc">Title A→Z</option>
               </select>
+              <button type="button" class="pf-clear pf-clear-sm" onclick="_et_clearFilter()"><i class="fa-solid fa-rotate-left"></i> Clear All</button>
             </div>
           </div>
 

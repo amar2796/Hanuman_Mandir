@@ -48,6 +48,10 @@
   <link rel="stylesheet" href="design-system.css" />
   <!-- Loaded LAST on purpose: mobile fixes must win the cascade over every file above -->
   <link rel="stylesheet" href="css/admin-mobile-responsive.css" />
+  <link rel="stylesheet" href="css/admin-polish.css" />
+  <link rel="stylesheet" href="css/admin-home-polish.css" />
+  <link rel="stylesheet" href="css/admin-dashboard-polish.css" />
+  <link rel="stylesheet" href="css/admin-filters-polish.css" />
 
   <!-- constants.js loaded here so APP.shortName is available to the anti-FOUC
        script below. Previously admin's dark-mode toggle lived deep inside
@@ -184,6 +188,10 @@
           <i class="fa-solid fa-chart-pie"></i> <span class="nav-label">Dashboard</span>
         </li>
 
+        <li onclick="showPage('dayBookPage',this)" class="nav-finance" data-label="Day Book">
+          <i class="fa-solid fa-book"></i> <span class="nav-label">Day Book</span>
+        </li>
+
         <!-- ── Section label: Finance ── -->
         <li class="nav-section-label">Finance</li>
         <li onclick="showPage('contributionPage',this)" class="nav-finance" data-label="Contribution">
@@ -200,9 +208,6 @@
         </li>
         <li onclick="showPage('yearSummaryPage',this)" class="nav-finance" data-label="Year Summary">
           <i class="fa-solid fa-calendar-check"></i> <span class="nav-label">Year Summary</span>
-        </li>
-        <li onclick="showPage('dayBookPage',this)" class="nav-finance" data-label="Day Book">
-          <i class="fa-solid fa-book"></i> <span class="nav-label">Day Book</span>
         </li>
         <li onclick="showPage('contributionRequestsPage',this)" class="nav-finance" id="nav_requests" data-label="Requests">
           <i class="fa-solid fa-inbox"></i> <span class="nav-label">Requests</span>
@@ -491,6 +496,8 @@
   <script src="js/admin-expense-duplicate.js"></script>
   <script src="js/admin-year-lock.js"></script>
   <script src="js/admin-access-level.js"></script>
+  <script src="js/admin-polish.js"></script>
+  <script src="js/admin-confirm.js"></script>
 
   <!-- Reusable single-date calendar (Add/Edit User → DOB, Contribution Start Date)
        Deliberately placed here, outside any .page wrapper — those are hidden via

@@ -228,7 +228,10 @@
         if (!checks.last_backup || checks.last_backup === "Never") warnings.push("no backup on record");
         _hcSetBadge(issues, warnings);
         // One brief toast so admin knows status without visiting the page
-        if (typeof toast === "function") {
+        // Health toast is for Super Admin only — Admin / Viewer don't act on it
+        var _isSuper = true;
+        try { if (typeof window._myAccessLevel === "function" && typeof window._alKey === "function") _isSuper = window._alKey(window._myAccessLevel()) === "super"; } catch (e) { _isSuper = true; }
+        if (typeof toast === "function" && _isSuper) {
           var msg = issues.length > 0
             ? "⚠️ System Health: " + issues[0] + (issues.length > 1 ? " (+" + (issues.length - 1) + " more)" : "")
             : warnings.length > 0

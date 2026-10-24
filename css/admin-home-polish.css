@@ -1,0 +1,80 @@
+/* ════════════════════════════════════════════════════════════
+   admin-home-polish.css — Home page: layout, KPI cards, quick
+   actions, chart, entrance motion. Look-and-feel only.
+   ════════════════════════════════════════════════════════════ */
+
+/* ── KPI cards: equal height, aligned numbers, soft glow ── */
+.hm-kpis{gap:14px !important;margin-bottom:18px !important;}
+.hm-kpis .stat-card-v2{
+  display:flex;flex-direction:column;justify-content:space-between;
+  min-height:140px;padding:16px 18px;border-radius:16px;border-left-width:4px;
+  background:linear-gradient(180deg,#fff 0%,color-mix(in srgb,var(--accent) 5%,#fff) 100%);
+  box-shadow:0 1px 2px rgba(15,23,42,.05),0 8px 24px -12px color-mix(in srgb,var(--accent) 35%,transparent);
+  transition:transform .25s cubic-bezier(.2,.8,.2,1),box-shadow .25s;
+}
+.hm-kpis .stat-card-v2::after{content:"";position:absolute;right:-28px;top:-28px;width:92px;height:92px;border-radius:50%;background:color-mix(in srgb,var(--accent) 9%,transparent);pointer-events:none;}
+.hm-kpis .stat-card-v2:hover{transform:translateY(-3px);box-shadow:0 2px 4px rgba(15,23,42,.06),0 16px 32px -14px color-mix(in srgb,var(--accent) 45%,transparent);}
+.hm-kpis .stat-card-v2 > div:first-child{align-items:flex-start !important;min-height:34px;}
+.hm-kpis .stat-card-v2 > div:first-child > span{width:34px;height:34px;border-radius:10px;display:grid !important;place-items:center;font-size:17px !important;flex:0 0 auto;background:color-mix(in srgb,var(--accent) 12%,transparent);}
+.hm-kpis .stat-label{font-size:10.5px;letter-spacing:.07em;line-height:1.35;max-width:75%;}
+.hm-kpis .stat-value{font-size:1.85rem !important;line-height:1.15;letter-spacing:-.01em;font-variant-numeric:tabular-nums;margin:6px 0 4px !important;}
+.hm-kpis .stat-trend{font-size:11.5px;}
+body.dark-mode .hm-kpis .stat-card-v2{background:linear-gradient(180deg,#131c2e 0%,color-mix(in srgb,var(--accent) 9%,#111827) 100%) !important;border-color:#1e2d45;box-shadow:0 1px 2px rgba(0,0,0,.4),0 10px 28px -14px color-mix(in srgb,var(--accent) 50%,transparent);}
+body.dark-mode .hm-kpis .stat-label{color:#94a3b8;}
+
+/* ── Two stacked columns (no empty stretching) ── */
+.hm-split{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start;margin-bottom:14px;}
+.hm-col{display:flex;flex-direction:column;gap:14px;min-width:0;}
+.hm-col > .card{margin-bottom:0 !important;}
+@media (max-width:900px){.hm-split{grid-template-columns:1fr;}}
+
+/* ── Quick Actions: 2×2 icon tiles ── */
+.hm-qa{display:grid !important;grid-template-columns:1fr 1fr;gap:10px !important;}
+.hm-qa button{
+  flex-direction:column !important;align-items:flex-start !important;justify-content:space-between;gap:10px !important;
+  min-height:76px;padding:12px 14px !important;border-radius:14px !important;font-size:12.5px !important;font-weight:700;
+  box-shadow:0 6px 16px -8px rgba(15,23,42,.45) !important;position:relative;overflow:hidden;
+  transition:transform .2s cubic-bezier(.2,.8,.2,1),box-shadow .2s,filter .2s;
+}
+.hm-qa button i{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;background:rgba(255,255,255,.2);font-size:13px;}
+.hm-qa button::after{content:"";position:absolute;right:-14px;bottom:-14px;width:56px;height:56px;border-radius:50%;background:rgba(255,255,255,.12);}
+.hm-qa button:hover{transform:translateY(-3px);filter:brightness(1.06);box-shadow:0 12px 22px -10px rgba(15,23,42,.55) !important;}
+.hm-qa button:active{transform:scale(.97);}
+
+/* ── Cards on the page: softer, consistent ── */
+#home .card{border-radius:16px;}
+#home .card > h3{font-size:13px;letter-spacing:.01em;}
+#hm_member_list .row,#hm_member_list > div{transition:background .15s;}
+#hm_member_list > div:hover{background:rgba(193,68,14,.05);border-radius:10px;}
+
+/* ── Monthly chart: taller rounded bars that grow in ── */
+#hm_bar_chart div[style*="height:8px"]{height:10px !important;border-radius:6px !important;}
+#hm_bar_chart div[style*="height:8px"] > div{border-radius:6px !important;transform-origin:left center;animation:hmGrow .8s cubic-bezier(.2,.8,.2,1) both;}
+#hm_bar_chart > div{border-radius:10px;transition:background .15s;}
+#hm_bar_chart > div:hover{background:rgba(193,68,14,.05);}
+body.dark-mode #hm_bar_chart div[style*="height:8px"]{background:#1a2538 !important;}
+@keyframes hmGrow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+
+/* ── Entrance motion (one soft stagger) ── */
+@keyframes hmUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+#home.page.active .hm-kpis > *{animation:hmUp .5s cubic-bezier(.2,.8,.2,1) both;}
+#home.page.active .hm-kpis > *:nth-child(2){animation-delay:.06s}
+#home.page.active .hm-kpis > *:nth-child(3){animation-delay:.12s}
+#home.page.active .hm-kpis > *:nth-child(4){animation-delay:.18s}
+#home.page.active .hm-col > .card{animation:hmUp .55s cubic-bezier(.2,.8,.2,1) both;animation-delay:.22s;}
+#home.page.active .hm-col > .card:nth-child(2){animation-delay:.3s}
+#home.page.active > .card{animation:hmUp .55s cubic-bezier(.2,.8,.2,1) both;animation-delay:.36s;}
+@media (prefers-reduced-motion:reduce){
+  #home *{animation:none !important;transition:none !important;}
+}
+
+/* ── Phone ── */
+@media (max-width:768px){
+  .hm-kpis{grid-template-columns:1fr 1fr !important;gap:10px !important;}
+  .hm-kpis .stat-card-v2{min-height:128px;padding:13px 14px;border-radius:14px;}
+  .hm-kpis .stat-value{font-size:1.5rem !important;}
+  .hm-kpis .stat-label{font-size:10px;max-width:70%;}
+  .hm-kpis .stat-card-v2 > div:first-child > span{width:30px;height:30px;font-size:15px !important;}
+  .hm-qa button{min-height:66px;}
+}
+.hm-kpis .stat-trend{flex-wrap:wrap;row-gap:2px;}
