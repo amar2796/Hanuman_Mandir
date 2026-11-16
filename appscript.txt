@@ -21,7 +21,7 @@
 //    name, location/address, receiptPrefix, emailDailyLimit,
 //    signatory, designation, tagline, thankYouMsg, version
 const CFG = {
-  version:       "4.0.0",        // SYNC with APP.version in constants.js
+  version:       "5.0.0",        // SYNC with APP.version in constants.js
   name:          "Shree Hanuman Mandir",
   location:      "Paliya, Sultanpur",
   address:       "Paliya, Sultanpur, Uttar Pradesh",
@@ -754,6 +754,11 @@ function autoBackupSystem() {
     const backupName = "Backup_Mandir_" + today;
     DriveApp.getFileById(ss.getId()).makeCopy(backupName, backupFolder);
     logAction("System", "autoBackup", "Backup created: " + backupName);
+    try {
+      var _bp = PropertiesService.getScriptProperties();
+      _bp.setProperty("LAST_BACKUP_AT", Utilities.formatDate(new Date(), "GMT+5:30", "dd-MM-yyyy HH:mm"));
+      _bp.setProperty("FS_HEALTH_LAST", "0");          // refresh the admin health snapshot within a minute
+    } catch (e) {}
 
     // Delete backups older than 30 days
     const cutoff = new Date();
@@ -2956,6 +2961,110 @@ function _emailRow(label, value) {
 // ════════════════════════════════════════════════════════════════
 //  MAIN GET HANDLER
 // ════════════════════════════════════════════════════════════════
+// Health check, as a function so it can run both for a request and in the background (snapshot for the admin pages).
+function _healthCheckResult() {
+    try {
+      const ss     = SpreadsheetApp.getActiveSpreadsheet();
+      const props  = PropertiesService.getScriptProperties();
+      const quota  = getEmailQuotaStatus();
+      const checks = {};
+
+      // Check all required sheets exist
+      const requiredSheets = ["USERS","CONTRIBUTIONS","EXPENSES","GOALS","TYPES",
+        "OCCASIONS","EXPENSE_TYPES","AUDIT_LOGS","SETTINGS","GALLERY",
+        "ANNOUNCEMENT","BROADCAST","EVENTS","EVENT_EXPENSES","CONTRIBUTION_REQUESTS"];
+      requiredSheets.forEach(function(name) {
+        checks["sheet_" + name] = !!ss.getSheetByName(name);
+      });
+
+      // Per-year receipt counters (new system — one key per year: RECEIPT_CNT_YYYY)
+      const _hcCurYr = new Date().getFullYear();
+      for (var _ry = _hcCurYr - 2; _ry <= _hcCurYr + 1; _ry++) {
+        var _rval = parseInt(props.getProperty("RECEIPT_CNT_" + _ry) || "0", 10);
+        if (_rval > 0) checks["receipt_count_" + _ry] = _rval;
+      }
+      // Legacy single counter — no longer incremented, kept for reference only
+      checks["receipt_counter_legacy"] = parseInt(props.getProperty("RECEIPT_COUNTER") || "0", 10);
+      
+
+      // Email quota
+      checks["email_used"]      = quota.used;
+      checks["email_limit"]     = quota.limit;
+      checks["email_remaining"] = quota.remaining;
+      // ── Row counts for each sheet ──
+      requiredSheets.forEach(function(name) {
+        var s = ss.getSheetByName(name);
+        checks["sheet_rows_" + name] = s ? Math.max(0, s.getLastRow() - 1) : 0;
+      });
+
+      // ── Column integrity check per sheet ──
+      var expectedCols = {
+        "USERS":                 ["UserId","Name","Mobile","Role","Password","Email","Status","SessionToken","Village","Address","RegisteredAt","PhotoURL","MonthlyTarget","LastLogin","DOB","TokenExpiry","ContribStartDate","InactiveSince","SessionTTL","ReactivatedAt","AccessLevel"],
+        "CONTRIBUTION_REQUESTS": ["ReqId","UserId","Amount","PaymentMode","ForMonth","Year","Note","UtrRef","Status","RequestedAt","SlipURL","RejectionNote"],
+        "BROADCAST":             ["BcId","Type","Priority","Title","Message","Time","AdminName","Status"],
+        "CONTRIBUTIONS":         ["Id","UserId","Amount","PaymentDate","ForMonth","Year","TypeId","OccasionId","Note","ReceiptID","PaymentMode"],
+        "EXPENSES":              ["Id","Title","Amount","PaymentDate","Year","ExpenseTypeId","ForMonth","ReceiptURL","ReceiptURLs"],
+        "GOALS":                 ["GoalId","GoalName","TargetAmount","CurrentAmount","Status","CreatedAt"],
+        "TYPES":                 ["TypeId","TypeName","SortOrder"],
+        "OCCASIONS":             ["OccasionId","OccasionName","SortOrder"],
+        "EXPENSE_TYPES":         ["ExpenseTypeId","Name","SortOrder"],
+        "EVENTS":                ["EventId","EventName","Category","StartDate","EndDate","Budget","Status","Description","CreatedAt","AdminName"],
+        "EVENT_EXPENSES":        ["Id","EventId","Title","Amount","PaymentDate","ExpenseTypeId","ForMonth","Note","AdminName"],
+        "GALLERY":               ["ImageId","Title","PhotoURL","Priority","Status","CreatedAt","Tags"],
+        "SETTINGS":              ["Key","Value","UpdatedAt"],
+        "FEEDBACK":              ["Timestamp","Name","Mobile","Address","Message","Status"],
+        "CHATBOT_CONFIG":        ["Key","Value","UpdatedAt"],
+        "AUDIT_LOGS":            ["Timestamp","Actor","Action","Result","Details","Reason","Error","DeviceInfo","Severity"],
+        "ANNOUNCEMENT":          ["AnnId","Message","Badge","Icon","Color","Status","AdminName","CreatedAt"],
+        "YEAR_CONFIG":           ["Year","OpeningBalance","Locked"]
+      };
+
+      Object.keys(expectedCols).forEach(function(name) {
+        var s = ss.getSheetByName(name);
+        if (!s) { checks["sheet_col_" + name] = "Sheet missing"; return; }
+        var lastCol = s.getLastColumn();
+        if (lastCol === 0) { checks["sheet_col_" + name] = "Sheet is empty"; return; }
+        var actual   = s.getRange(1, 1, 1, lastCol).getValues()[0].map(function(h){ return String(h).trim(); });
+        var expected = expectedCols[name];
+        var missing  = expected.filter(function(c){ return actual.indexOf(c) === -1; });
+        var extra    = actual.filter(function(c){ return c !== "" && expected.indexOf(c) === -1; });
+        if (missing.length === 0 && extra.length === 0) {
+          checks["sheet_col_" + name] = true;
+        } else {
+          var msg = [];
+          if (missing.length > 0) msg.push("Missing: " + missing.join(", "));
+          if (extra.length > 0)   msg.push("Unknown: " + extra.join(", "));
+          checks["sheet_col_" + name] = msg.join(" | ");
+        }
+      });
+
+      // Backup — find latest backup in Mandir_Backups folder
+      let lastBackup = props.getProperty("LAST_BACKUP_AT") || "Never";
+      if (lastBackup === "Never") try {
+        const folderIter = DriveApp.getRootFolder().getFoldersByName("Mandir_Backups");
+        if (folderIter.hasNext()) {
+          const backupFolder = folderIter.next();
+          const files = backupFolder.getFiles();
+          let latest = null;
+          while (files.hasNext()) {
+            const f = files.next();
+            if (!latest || f.getDateCreated() > latest.getDateCreated()) latest = f;
+          }
+          if (latest) lastBackup = Utilities.formatDate(latest.getDateCreated(), "GMT+5:30", "dd-MM-yyyy HH:mm");
+        }
+      } catch(be) {}
+      checks["last_backup"] = lastBackup;
+      if (lastBackup !== "Never") { try { props.setProperty("LAST_BACKUP_AT", lastBackup); } catch (e) {} }
+
+      // CFG version
+      checks["version"] = CFG.version || "—";
+
+      return { status: "ok", checks: checks };
+    } catch(err) {
+      return { status: "error", message: err.message };
+    }
+}
+
 function _doGetCore(e) {
   const action   = sanitize(e.parameter.action, 50);
   // FIX SEC-3: Whitelist callback to alphanumeric+underscore only — prevents JSONP injection
@@ -4837,105 +4946,7 @@ function _doGetCore(e) {
 
   // ── HEALTH CHECK
   else if (action === "getHealthCheck") {
-    try {
-      const ss     = SpreadsheetApp.getActiveSpreadsheet();
-      const props  = PropertiesService.getScriptProperties();
-      const quota  = getEmailQuotaStatus();
-      const checks = {};
-
-      // Check all required sheets exist
-      const requiredSheets = ["USERS","CONTRIBUTIONS","EXPENSES","GOALS","TYPES",
-        "OCCASIONS","EXPENSE_TYPES","AUDIT_LOGS","SETTINGS","GALLERY",
-        "ANNOUNCEMENT","BROADCAST","EVENTS","EVENT_EXPENSES","CONTRIBUTION_REQUESTS"];
-      requiredSheets.forEach(function(name) {
-        checks["sheet_" + name] = !!ss.getSheetByName(name);
-      });
-
-      // Per-year receipt counters (new system — one key per year: RECEIPT_CNT_YYYY)
-      const _hcCurYr = new Date().getFullYear();
-      for (var _ry = _hcCurYr - 2; _ry <= _hcCurYr + 1; _ry++) {
-        var _rval = parseInt(props.getProperty("RECEIPT_CNT_" + _ry) || "0", 10);
-        if (_rval > 0) checks["receipt_count_" + _ry] = _rval;
-      }
-      // Legacy single counter — no longer incremented, kept for reference only
-      checks["receipt_counter_legacy"] = parseInt(props.getProperty("RECEIPT_COUNTER") || "0", 10);
-      
-
-      // Email quota
-      checks["email_used"]      = quota.used;
-      checks["email_limit"]     = quota.limit;
-      checks["email_remaining"] = quota.remaining;
-      // ── Row counts for each sheet ──
-      requiredSheets.forEach(function(name) {
-        var s = ss.getSheetByName(name);
-        checks["sheet_rows_" + name] = s ? Math.max(0, s.getLastRow() - 1) : 0;
-      });
-
-      // ── Column integrity check per sheet ──
-      var expectedCols = {
-        "USERS":                 ["UserId","Name","Mobile","Role","Password","Email","Status","SessionToken","Village","Address","RegisteredAt","PhotoURL","MonthlyTarget","LastLogin","DOB","TokenExpiry","ContribStartDate","InactiveSince","SessionTTL","ReactivatedAt","AccessLevel"],
-        "CONTRIBUTION_REQUESTS": ["ReqId","UserId","Amount","PaymentMode","ForMonth","Year","Note","UtrRef","Status","RequestedAt","SlipURL","RejectionNote"],
-        "BROADCAST":             ["BcId","Type","Priority","Title","Message","Time","AdminName","Status"],
-        "CONTRIBUTIONS":         ["Id","UserId","Amount","PaymentDate","ForMonth","Year","TypeId","OccasionId","Note","ReceiptID","PaymentMode"],
-        "EXPENSES":              ["Id","Title","Amount","PaymentDate","Year","ExpenseTypeId","ForMonth","ReceiptURL","ReceiptURLs"],
-        "GOALS":                 ["GoalId","GoalName","TargetAmount","CurrentAmount","Status","CreatedAt"],
-        "TYPES":                 ["TypeId","TypeName","SortOrder"],
-        "OCCASIONS":             ["OccasionId","OccasionName","SortOrder"],
-        "EXPENSE_TYPES":         ["ExpenseTypeId","Name","SortOrder"],
-        "EVENTS":                ["EventId","EventName","Category","StartDate","EndDate","Budget","Status","Description","CreatedAt","AdminName"],
-        "EVENT_EXPENSES":        ["Id","EventId","Title","Amount","PaymentDate","ExpenseTypeId","ForMonth","Note","AdminName"],
-        "GALLERY":               ["ImageId","Title","PhotoURL","Priority","Status","CreatedAt","Tags"],
-        "SETTINGS":              ["Key","Value","UpdatedAt"],
-        "FEEDBACK":              ["Timestamp","Name","Mobile","Address","Message","Status"],
-        "CHATBOT_CONFIG":        ["Key","Value","UpdatedAt"],
-        "AUDIT_LOGS":            ["Timestamp","Actor","Action","Result","Details","Reason","Error","DeviceInfo","Severity"],
-        "ANNOUNCEMENT":          ["AnnId","Message","Badge","Icon","Color","Status","AdminName","CreatedAt"],
-        "YEAR_CONFIG":           ["Year","OpeningBalance","Locked"]
-      };
-
-      Object.keys(expectedCols).forEach(function(name) {
-        var s = ss.getSheetByName(name);
-        if (!s) { checks["sheet_col_" + name] = "Sheet missing"; return; }
-        var lastCol = s.getLastColumn();
-        if (lastCol === 0) { checks["sheet_col_" + name] = "Sheet is empty"; return; }
-        var actual   = s.getRange(1, 1, 1, lastCol).getValues()[0].map(function(h){ return String(h).trim(); });
-        var expected = expectedCols[name];
-        var missing  = expected.filter(function(c){ return actual.indexOf(c) === -1; });
-        var extra    = actual.filter(function(c){ return c !== "" && expected.indexOf(c) === -1; });
-        if (missing.length === 0 && extra.length === 0) {
-          checks["sheet_col_" + name] = true;
-        } else {
-          var msg = [];
-          if (missing.length > 0) msg.push("Missing: " + missing.join(", "));
-          if (extra.length > 0)   msg.push("Unknown: " + extra.join(", "));
-          checks["sheet_col_" + name] = msg.join(" | ");
-        }
-      });
-
-      // Backup — find latest backup in Mandir_Backups folder
-      let lastBackup = "Never";
-      try {
-        const folderIter = DriveApp.getRootFolder().getFoldersByName("Mandir_Backups");
-        if (folderIter.hasNext()) {
-          const backupFolder = folderIter.next();
-          const files = backupFolder.getFiles();
-          let latest = null;
-          while (files.hasNext()) {
-            const f = files.next();
-            if (!latest || f.getDateCreated() > latest.getDateCreated()) latest = f;
-          }
-          if (latest) lastBackup = Utilities.formatDate(latest.getDateCreated(), "GMT+5:30", "dd-MM-yyyy HH:mm");
-        }
-      } catch(be) {}
-      checks["last_backup"] = lastBackup;
-
-      // CFG version
-      checks["version"] = CFG.version || "—";
-
-      result = { status: "ok", checks: checks };
-    } catch(err) {
-      result = { status: "error", message: err.message };
-    }
+    result = _healthCheckResult();
   }
 
   // ── TRAFFIC STATS
@@ -9087,10 +9098,25 @@ function _fsSyncPhotoThumbs(force) {
 }
 
 // The new 1-minute trigger: everything the previous one did, plus the photo thumbnails.
+// Health snapshot for the admin pages: computed in the background (about every 15 minutes), read instantly by every admin.
+function _fsSyncHealth(force) {
+  var props = PropertiesService.getScriptProperties(), now = Date.now();
+  if (!force && now - Number(props.getProperty("FS_HEALTH_LAST") || 0) < 15 * 60 * 1000) return "skipped (fresh enough)";
+  var res = _healthCheckResult();
+  if (!res || res.status !== "ok") return "health check failed: " + (res && res.message);
+  _fsCommit([{ update: { name: _fsDocName("adminMeta", "health"), fields: {
+    at: { integerValue: String(now) }, json: { stringValue: JSON.stringify(res) }
+  } } }]);
+  props.setProperty("FS_HEALTH_LAST", String(now));
+  return "health snapshot saved";
+}
+function testHealthSnapshot() { Logger.log(_fsSyncHealth(true)); }
+
 function fsSyncTick3() {
   var dirty = !!CacheService.getScriptCache().get("fs_dirty");   // read BEFORE the sync clears it
   fsSyncTick2();
   try { _fsSyncPhotoThumbs(dirty); } catch (err) { /* tried again later */ }
+  try { _fsSyncHealth(false); } catch (err) { /* tried again later */ }
 }
 
 function setupFirestoreSyncTrigger3() {

@@ -5,6 +5,7 @@
 (function () {
   var V = "10.12.2", B = "https://www.gstatic.com/firebasejs/" + V + "/", _p = null, _cache = null, _cacheAt = 0;
   var _imp = function (u) { return import(u); };
+  var _skipHook = false;                               // set while the normal Apps Script fallback is being started (stops a loop)
 
   function sdk() {
     if (_p) return _p;
@@ -204,17 +205,39 @@
     });
   }
 
+  // Health check: the server prepares it in the background (about every 15 minutes) and every admin reads the same snapshot instantly.
+  function fbHealth(userId) {
+    return cached("hc", 0, function () {
+      return signedInAs(userId).then(function (s) {
+        var F = s.F;
+        return F.getDoc(F.doc(s.db, "adminMeta", "health")).then(function (d) {
+          if (!d.exists()) throw new Error("no health snapshot yet");
+          var x = d.data();
+          if (!x.at || Date.now() - Number(x.at) > 30 * 60 * 1000) throw new Error("health snapshot is old");   // -> normal Apps Script call
+          return JSON.parse(x.json);
+        });
+      });
+    });
+  }
+
   // Returns a Promise of the answer, or null when this action is not handled here (-> normal Apps Script call).
-  var _FB_READS = { getContributionRequests: 1, getUserContributionRequests: 1, getBroadcasts: 1, getBroadcastsAdmin: 1, getTodayBirthdays: 1, getMyBirthdayWishes: 1 };
+  var _FB_READS = { getHealthCheck: 1, getAllData: 1, getUsers: 1, getContributionRequests: 1, getUserContributionRequests: 1, getBroadcasts: 1, getBroadcastsAdmin: 1, getTodayBirthdays: 1, getMyBirthdayWishes: 1 };
   window.mandirFirebaseFetch = function (action) {
     var a = String(action || "").split("&")[0];
-    if (!_FB_READS[a]) return null;
+    if (!_FB_READS[a] || _skipHook) return null;
     try {
       var s = JSON.parse(localStorage.getItem("session") || "null");
       if (!s || !s.userId) return null;
-      if (Number(localStorage.getItem("fb_stale_until") || 0) > Date.now()) return null;       // just changed something: live sheet
+      if (a !== "getHealthCheck" && Number(localStorage.getItem("fb_stale_until") || 0) > Date.now()) return null;   // just changed something: live sheet (the health snapshot does not depend on it)
       var role = String(s.role || "").toLowerCase();
-      if ((a === "getContributionRequests" || a === "getBroadcastsAdmin") && role !== "admin") return null;
+      if ((a === "getContributionRequests" || a === "getBroadcastsAdmin" || a === "getUsers" || a === "getHealthCheck") && role !== "admin") return null;
+      if (a === "getHealthCheck") return fbHealth(s.userId);
+      if (a === "getAllData") {                                                       // every "load all data" call, wherever it comes from
+        if (role === "admin") return window.fbLoadAdminData(s.userId, false);
+        if (role === "user") return window.fbLoadMemberData(s.userId, false);
+        return null;
+      }
+      if (a === "getUsers") return window.fbLoadAdminData(s.userId, false).then(function (d) { return d.users; });
       if (a === "getContributionRequests" || a === "getUserContributionRequests") return fbLoadRequests(a, s.userId);
       if (a === "getBroadcasts") return fbBroadcasts(s.userId, false);
       if (a === "getBroadcastsAdmin") return fbBroadcasts(s.userId, true);
@@ -234,7 +257,17 @@
         if (role === "admin") return await window.fbLoadAdminData(s.userId, force);
       }
     } catch (e) { try { console.warn("[firebase] using Apps Script instead:", e && e.message); } catch (x) {} }
-    return getCached("getAllData");
+    _skipHook = true;                                  // we already tried Firestore: go straight to Apps Script
+    try { return getCached("getAllData"); } finally { _skipHook = false; }
+  };
+
+  // Called when something was saved: forget every saved Firestore copy so the next read is fresh.
+  window.mandirFbInvalidate = function () {
+    _cache = null; _acache = null; _fc = {}; _rq = {};
+    try {
+      sessionStorage.removeItem("fb_admin_cache");
+      for (var i = sessionStorage.length - 1; i >= 0; i--) { var k = sessionStorage.key(i); if (k && k.indexOf("fbc_") === 0) sessionStorage.removeItem(k); }
+    } catch (e) {}
   };
 
   window.fbSignOut = function () { return sdk().then(function (s) { return s.A.signOut(s.auth); }).catch(function () {}); };

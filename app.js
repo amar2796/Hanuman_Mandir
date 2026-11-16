@@ -255,7 +255,18 @@ window._fbReady=(function(){
 })();
 // Reads: if firebase-member.js can answer this action from Firestore (no Apps Script, no waiting for the
 // session registration) it does; if it returns nothing or fails, the normal Apps Script call runs.
+// Some reads are heavy and are asked for by several screens at the same moment (the health check is requested
+// 3 times when the admin page opens). Identical calls within 90 s now share ONE request to the server.
+var _FB_SHARED_TTL={getHealthCheck:90000};
+var _fbSharedCalls={};
 function getData(action,_sAttempt,_nAttempt){
+  var ttl=(!_sAttempt&&!_nAttempt)?_FB_SHARED_TTL[action]:0;
+  if(ttl){var c=_fbSharedCalls[action];if(c&&Date.now()-c.at<ttl)return c.p;}
+  var p=_getDataFB(action,_sAttempt,_nAttempt);
+  if(ttl){_fbSharedCalls[action]={p:p,at:Date.now()};p.then(null,function(){if(_fbSharedCalls[action]&&_fbSharedCalls[action].p===p)delete _fbSharedCalls[action];});}
+  return p;
+}
+function _getDataFB(action,_sAttempt,_nAttempt){
   var h=null;
   try{if(!_sAttempt&&!_nAttempt&&window.mandirFirebaseFetch)h=window.mandirFirebaseFetch(action);}catch(e){h=null;}
   var slow=function(){return window._fbReady.then(function(){return _getDataRaw(action,_sAttempt,_nAttempt);});};
@@ -265,7 +276,7 @@ function getData(action,_sAttempt,_nAttempt){
 // Writes: remember "data just changed" so reads use the live sheet for 3 minutes (Firestore catches up within ~1-2 min).
 var _FB_WRITE_RE=/^(add|update|delete|approve|reject|restore|reset|change|resolve|register|verify|submit|edit|save|remove|upload|clear|toggle|send|setYearLock|setAccessLevel)/i;
 function postData(data){
-  try{if(data&&_FB_WRITE_RE.test(String(data.action||"")))localStorage.setItem("fb_stale_until",String(Date.now()+3*60*1000));}catch(e){}
+  try{if(data&&_FB_WRITE_RE.test(String(data.action||""))){localStorage.setItem("fb_stale_until",String(Date.now()+3*60*1000));if(window.mandirFbInvalidate)window.mandirFbInvalidate();}}catch(e){}
   return window._fbReady.then(function(){return _postDataRaw(data);});
 }
 // Photos: keep each avatar on this device for 7 days so it is fetched through Apps Script only once.
@@ -633,7 +644,7 @@ function getCached(action) {
    Already called automatically by postData wrapping below.
    ═══════════════════════════════════════════════════════════ */
 function mandirCacheBust(action) {
-  try { if (!action || action === "getAllData") localStorage.setItem("fb_stale_until", String(Date.now() + 3*60*1000)); } catch (e) {} // data just changed: read the live sheet for 3 min
+  try { if (!action || action === "getAllData") { localStorage.setItem("fb_stale_until", String(Date.now() + 3*60*1000)); if (window.mandirFbInvalidate) window.mandirFbInvalidate(); } } catch (e) {} // data just changed: read the live sheet for 3 min and forget the saved Firestore copies
   if (action) {
     delete window._mandirCache[action];
     delete window._mandirPending[action];
