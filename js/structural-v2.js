@@ -19,6 +19,7 @@
     { label: "Master Data", page: "masterPage", icon: "fa-database" },
     { label: "Gallery", page: "galleryAdminPage", icon: "fa-images" },
     { label: "Announcement", page: "announcementPage", icon: "fa-bullhorn" },
+    { label: "Upcoming Event", page: "upcomingEventPage", icon: "fa-calendar-day" },
     { label: "Broadcast", page: "broadcastPage", icon: "fa-tower-broadcast" },
     { label: "Chatbot", page: "chatbotPage", icon: "fa-robot" },
     { label: "Feedback", page: "feedbackAdminPage", icon: "fa-comment" },

@@ -1328,6 +1328,7 @@
       if (id === "dayBookPage" && typeof dayBookInit === "function") dayBookInit();
       if (id === "galleryAdminPage") loadGalleryAdmin();
       if (id === "announcementPage") loadAnnouncementAdmin();
+      if (id === "upcomingEventPage" && typeof loadUpcomingEventAdmin === "function") loadUpcomingEventAdmin();
       // Tracker: re-render with current live data every time the tab is opened,
       // instead of relying only on the one-time DOMContentLoaded poll (which
       // can miss data that loads after that poll gives up).

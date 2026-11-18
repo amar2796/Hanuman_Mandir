@@ -88,6 +88,7 @@ const SHEETS = {
   EVENTS:         "EVENTS",
   EVENT_EXPENSES: "EVENT_EXPENSES",
   WISHES:         "WISHES",   // Birthday wishes sent between members
+  UPCOMING:       "UPCOMING_EVENTS", // Upcoming-event tag shown on receipts / summaries
 };
 
 
@@ -469,6 +470,7 @@ function generateSheetId(prefix, yearReset) {
       "BCAST": { sheet: SHEETS.BROADCAST,     col: "Id",         pat: /^BCAST-(\d+)$/ },
       "GAL":   { sheet: SHEETS.GALLERY,       col: "Id",         pat: /^GAL-(\d+)$/   },
       "EVT":   { sheet: SHEETS.EVENTS,        col: "EventId",    pat: /^EVT-(\d+)$/   },
+      "UEV":   { sheet: SHEETS.UPCOMING,      col: "EvId",       pat: /^UEV-(\d+)$/   },
       "EEXP":  { sheet: SHEETS.EVENT_EXPENSES,col: "Id",         pat: /^EEXP-(\d+)$/  },
       "WISH":  { sheet: SHEETS.WISHES,        col: "WishId",     pat: /^WISH-(\d+)$/  },
     };
@@ -1702,13 +1704,14 @@ function _buildAdminSummaryPdfHtml(data) {
     { split: 6,  mRow: 15, oRow: 15, hRow: 16, oHead: 16, thFs: 8.5, fs: 9,    fsS: 8.5,  dot: 9,  compact: true,  base: 255, eChrome: 66, wChrome: 66 },
     { split: 6,  mRow: 13, oRow: 13, hRow: 14, oHead: 14, thFs: 8,   fs: 8,    fsS: 7.5,  dot: 8,  compact: true,  base: 253, eChrome: 64, wChrome: 64 }
   ];
+  const uevList = _uevGetActive();   // upcoming-event strip (adds height, so it is part of the fit)
   const AVAIL = 1000;   // usable px on one A4 page (1026) minus a safety margin
   const nMembers = data.paidList.length + data.unpaidList.length;
   const nExp = expenseList.length, nWalk = walkinList.length;
   const colsOf = (T, n) => n > T.split ? 2 : 1;
   function estimate(T) {
     const rowsOf = n => Math.ceil(n / colsOf(T, n));
-    return T.base + rowsOf(nMembers) * T.mRow +
+    return T.base + _uevPdfHeight(uevList.length, T.compact) + rowsOf(nMembers) * T.mRow +
            (nExp  ? T.eChrome + rowsOf(nExp)  * T.oRow : 0) +
            (nWalk ? T.wChrome + rowsOf(nWalk) * T.oRow : 0);
   }
@@ -1972,7 +1975,7 @@ function _buildAdminSummaryPdfHtml(data) {
 
   return "<html><head><meta charset='utf-8'></head>" +
     "<body style='font-family:Arial,sans-serif;color:#2B2B2B;margin:0;padding:" + V.bodyPad + "px 32px;-webkit-print-color-adjust:exact;print-color-adjust:exact;'>" +
-    header + progressCard + statsRow + sections + footerNote +
+    header + _uevPdfStrip(uevList, fill, K) + progressCard + statsRow + sections + footerNote +
     "</body></html>";
 }
 
@@ -2275,6 +2278,7 @@ function _buildAdminSummaryEmail(data) {
   ${_emHeader("ADMIN MONTHLY SUMMARY", null, ACCENT)}
   <tr><td style="padding:22px 28px 24px;">
     ${subtitle}
+    ${_uevEmailBox()}
     ${progressCard}
     ${statsRow}
     ${sections}
@@ -2815,6 +2819,8 @@ function _buildMonthlyReceiptEmail(member, contribs, types, month, year, totalAm
     <div style="font-weight:700;color:${_EM.ink};font-size:13px;margin-bottom:8px;">Contribution Details</div>
     <table width="100%" cellpadding="0" cellspacing="0">${rowsHtml}</table>
   </td></tr>
+  ${_uevEmailRow()}
+
   <tr><td style="padding:8px 32px 22px;text-align:center;">
     <div style="color:${_EM.brand};font-size:13px;font-weight:600;">🙏 ${CFG.thankYouMsg}</div>
     <div style="color:${_EM.sub};font-size:11.5px;margin-top:3px;">${CFG.tagline}</div>
@@ -2918,6 +2924,8 @@ function sendReceiptEmail(toEmail, donorName, receiptId, amount, forMonth, year,
       </td>
     </tr></table>
   </td></tr>
+
+  ${_uevEmailRow()}
 
   <tr><td style="padding:0 32px 22px;text-align:center;">
     <div style="color:${_EM.brand};font-size:13px;font-weight:600;">🙏 ${CFG.thankYouMsg}</div>
@@ -3106,6 +3114,7 @@ function _doGetCore(e) {
     "deleteGalleryPhoto",
     // Settings & comms
     "saveEmailSettings","saveAnnouncement","clearAnnouncement","toggleAnnouncementStatus",
+    "saveUpcomingEvent","toggleUpcomingEvent","deleteUpcomingEvent","setUpcomingMaster","getUpcomingEventsAdmin",
     "saveBroadcast","deleteBroadcast","toggleBroadcast","saveChatbotConfig",
     // Feedback & contribution requests
     "updateFeedbackStatus","deleteFeedback",
@@ -4850,6 +4859,12 @@ function _doGetCore(e) {
 
   // ── ANNOUNCEMENTS & BROADCASTS (unchanged from original)
   else if (action === "getAnnouncement")        { result = _getAnnouncement(); }
+  else if (action === "getUpcomingEvents")      { result = _uevPublic(); }
+  else if (action === "getUpcomingEventsAdmin") { result = _uevAdminList(); }
+  else if (action === "saveUpcomingEvent")      { result = _uevSave(e); }
+  else if (action === "toggleUpcomingEvent")    { result = _uevToggle(e); }
+  else if (action === "deleteUpcomingEvent")    { result = _uevDelete(e); }
+  else if (action === "setUpcomingMaster")      { result = _uevSetMaster(e); }
   else if (action === "getAnnouncementHistory") { result = _getAnnouncementHistory(); }
   else if (action === "getBroadcasts")          { result = _getBroadcasts(); }
   else if (action === "getBroadcastsAdmin")     { result = _getBroadcastsAdmin(); }
@@ -6007,6 +6022,7 @@ const _ACTION_MIN = {
   addEvent: "super", updateEvent: "super", deleteEvent: "super", addEventExpense: "super",
   deleteGalleryPhoto: "super", uploadGalleryPhoto: "super",
   saveEmailSettings: "super", saveAnnouncement: "super", clearAnnouncement: "super", toggleAnnouncementStatus: "super",
+  saveUpcomingEvent: "admin", toggleUpcomingEvent: "admin", setUpcomingMaster: "admin", deleteUpcomingEvent: "super",   // upcoming-event tag: Admin adds/edits/toggles, only Super Admin deletes
   saveBroadcast: "super", deleteBroadcast: "super", toggleBroadcast: "super", saveChatbotConfig: "super",
   deleteFeedback: "super", deleteContributionRequest: "super",
   triggerMonthlyReport: "super", triggerMonthlyReminder: "super", sendMonthlyReminders: "super",
@@ -6366,6 +6382,238 @@ function updateExpenseRow(name, body) {
     }
   }
   return { status: "not found" };
+}
+
+// ════════════════════════════════════════════════════════════════
+//  UPCOMING EVENT TAG  (bal bhoj, bhandara, jagran ...)
+//  Small strip printed on receipts (PDF / print / email), the member monthly
+//  email and the Admin Monthly Summary (PDF / image / email).
+//  Storage : sheet UPCOMING_EVENTS (created automatically on first use)
+//  Master  : Script Property UEV_MASTER ("off" hides the tag everywhere)
+//  Shown   : only enabled events whose date is today or later, nearest 2.
+//  Safety  : any problem here returns "no event" - it can never break a receipt or report.
+// ════════════════════════════════════════════════════════════════
+const UEV_HEADERS   = ["EvId","Title","EventDate","Note","Enabled","AdminName","CreatedAt","UpdatedAt"];
+const UEV_CACHE_KEY = "uev_enabled_v1";
+const UEV_MAX_SHOWN = 2;
+const UEV_MAX_ROWS  = 60;
+const UEV_DOW = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+const UEV_MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+function _uevSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sh = ss.getSheetByName(SHEETS.UPCOMING);
+  if (!sh) {
+    sh = ss.insertSheet(SHEETS.UPCOMING);
+    sh.appendRow(UEV_HEADERS);
+    sh.getRange("C:C").setNumberFormat("@");   // keep dates as plain yyyy-mm-dd text
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+function _uevMasterOn() { return PropertiesService.getScriptProperties().getProperty("UEV_MASTER") !== "off"; }
+function _uevBust() { try { CacheService.getScriptCache().remove(UEV_CACHE_KEY); } catch (e) {} }
+function _uevToday() { return Utilities.formatDate(new Date(), "Asia/Kolkata", "yyyy-MM-dd"); }
+function _uevPad2(n) { return (Number(n) < 10 ? "0" : "") + Number(n); }
+function _uevNormDate(v) {
+  if (v instanceof Date) return Utilities.formatDate(v, "Asia/Kolkata", "yyyy-MM-dd");
+  const t = String(v === undefined || v === null ? "" : v).trim();
+  let m = t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (m) return m[1] + "-" + _uevPad2(m[2]) + "-" + _uevPad2(m[3]);
+  m = t.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})$/);
+  if (m) return m[3] + "-" + _uevPad2(m[2]) + "-" + _uevPad2(m[1]);
+  return "";
+}
+function _uevPretty(iso) {
+  const m = String(iso || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return "";
+  const dt = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+  return UEV_DOW[dt.getUTCDay()] + ", " + Number(m[3]) + " " + UEV_MON[Number(m[2]) - 1] + " " + m[1];
+}
+function _uevReadAll() {
+  const sh = _uevSheet();
+  const vals = sh.getDataRange().getValues();
+  if (vals.length < 2) return [];
+  const h = vals[0].map(function (x) { return String(x).trim(); });
+  const ix = function (n) { return h.indexOf(n); };
+  const out = [];
+  for (let i = 1; i < vals.length; i++) {
+    const r = vals[i];
+    const id = String(r[ix("EvId")] || "").trim();
+    if (!id) continue;
+    const en = String(r[ix("Enabled")] === undefined || r[ix("Enabled")] === "" ? "Yes" : r[ix("Enabled")]).trim().toLowerCase();
+    out.push({
+      row: i + 1, id: id,
+      title: String(r[ix("Title")] || "").trim(),
+      date: _uevNormDate(r[ix("EventDate")]),
+      note: String(r[ix("Note")] || "").trim(),
+      enabled: !(en === "no" || en === "false" || en === "off"),
+      adminName: String(r[ix("AdminName")] || ""),
+      updatedAt: String(r[ix("UpdatedAt")] || r[ix("CreatedAt")] || "")
+    });
+  }
+  return out;
+}
+// The events that should be printed right now (max 2, nearest first). Never throws.
+function _uevGetActive() {
+  try {
+    if (!_uevMasterOn()) return [];
+    let list = null;
+    const cache = CacheService.getScriptCache();
+    const hit = cache.get(UEV_CACHE_KEY);
+    if (hit) { try { list = JSON.parse(hit); } catch (e) { list = null; } }
+    if (!list) {
+      list = _uevReadAll().filter(function (e) { return e.enabled && e.title && e.date; })
+        .map(function (e) { return { id: e.id, title: e.title, date: e.date, note: e.note }; });
+      try { cache.put(UEV_CACHE_KEY, JSON.stringify(list), 300); } catch (e) {}
+    }
+    const today = _uevToday();
+    return list.filter(function (e) { return e.date >= today; })
+      .sort(function (a, b) { return a.date < b.date ? -1 : (a.date > b.date ? 1 : 0); })
+      .slice(0, UEV_MAX_SHOWN)
+      .map(function (e) { return { id: e.id, title: e.title, date: e.date, dateText: _uevPretty(e.date), note: e.note || "" }; });
+  } catch (err) { return []; }
+}
+function _uevPublic() {
+  const ev = _uevGetActive();
+  return { status: "success", events: ev };
+}
+function _uevAdminList() {
+  try {
+    const today = _uevToday();
+    const all = _uevReadAll().map(function (e) {
+      return { id: e.id, title: e.title, date: e.date, dateText: _uevPretty(e.date), note: e.note, enabled: e.enabled, expired: !!e.date && e.date < today, adminName: e.adminName, updatedAt: e.updatedAt };
+    });
+    all.sort(function (a, b) { return a.date < b.date ? -1 : (a.date > b.date ? 1 : 0); });
+    return { status: "success", master: _uevMasterOn(), events: all, today: today, maxShown: UEV_MAX_SHOWN };
+  } catch (err) { return { status: "error", message: err.message }; }
+}
+function _uevSave(e) {
+  try {
+    const title = sanitize(e.parameter.Title, 80);
+    const note  = sanitize(e.parameter.Note, 120);
+    const date  = _uevNormDate(e.parameter.EventDate);
+    const admin = sanitize(e.parameter.AdminName || "Admin", 100) || "Admin";
+    const evId  = sanitize(e.parameter.EvId, 30);
+    const enabled = String(e.parameter.Enabled || "Yes").toLowerCase() === "no" ? "No" : "Yes";
+    if (!title) return { status: "error", message: "Please enter the event name." };
+    if (!date)  return { status: "error", message: "Please choose a valid event date." };
+    if (date < _uevToday()) return { status: "error", message: "That date has already passed. Choose today or a later date." };
+    const lock = LockService.getScriptLock();
+    lock.waitLock(8000);
+    try {
+      const sh = _uevSheet();
+      const all = _uevReadAll();
+      const hdr = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(String);
+      const now = formatDate();
+      if (evId) {
+        const cur = all.filter(function (x) { return x.id === evId; })[0];
+        if (!cur) return { status: "error", message: "Event not found." };
+        const set = function (name, val) { const c = hdr.indexOf(name); if (c > -1) sh.getRange(cur.row, c + 1).setValue(val); };
+        set("Title", title); set("EventDate", date); set("Note", note); set("Enabled", enabled); set("AdminName", admin); set("UpdatedAt", now);
+        logAction(admin, "saveUpcomingEvent", "Edited " + evId + " | " + title + " | " + date);
+        _uevBust();
+        return { status: "success", evId: evId };
+      }
+      if (all.length >= UEV_MAX_ROWS) return { status: "error", message: "Too many saved events. Delete old ones first." };
+      const newId = generateSheetId("UEV");
+      const row = hdr.map(function (n) {
+        if (n === "EvId") return newId;
+        if (n === "Title") return title;
+        if (n === "EventDate") return date;
+        if (n === "Note") return note;
+        if (n === "Enabled") return enabled;
+        if (n === "AdminName") return admin;
+        if (n === "CreatedAt" || n === "UpdatedAt") return now;
+        return "";
+      });
+      sh.appendRow(row);
+      SpreadsheetApp.flush();
+      logAction(admin, "saveUpcomingEvent", "Added " + newId + " | " + title + " | " + date);
+      _uevBust();
+      return { status: "success", evId: newId };
+    } finally { lock.releaseLock(); }
+  } catch (err) { return { status: "error", message: err.message }; }
+}
+function _uevToggle(e) {
+  try {
+    const evId = sanitize(e.parameter.EvId, 30);
+    const on = String(e.parameter.Enabled || "").toLowerCase() === "no" ? "No" : "Yes";
+    const admin = sanitize(e.parameter.AdminName || "Admin", 100) || "Admin";
+    const lock = LockService.getScriptLock();
+    lock.waitLock(8000);
+    try {
+      const sh = _uevSheet();
+      const cur = _uevReadAll().filter(function (x) { return x.id === evId; })[0];
+      if (!cur) return { status: "error", message: "Event not found." };
+      const hdr = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(String);
+      sh.getRange(cur.row, hdr.indexOf("Enabled") + 1).setValue(on);
+      const u = hdr.indexOf("UpdatedAt"); if (u > -1) sh.getRange(cur.row, u + 1).setValue(formatDate());
+      logAction(admin, "toggleUpcomingEvent", evId + " -> " + (on === "Yes" ? "Shown" : "Hidden"));
+      _uevBust();
+      return { status: "success", enabled: on === "Yes" };
+    } finally { lock.releaseLock(); }
+  } catch (err) { return { status: "error", message: err.message }; }
+}
+function _uevDelete(e) {
+  try {
+    const evId = sanitize(e.parameter.EvId, 30);
+    const admin = sanitize(e.parameter.AdminName || "Admin", 100) || "Admin";
+    const lock = LockService.getScriptLock();
+    lock.waitLock(8000);
+    try {
+      const cur = _uevReadAll().filter(function (x) { return x.id === evId; })[0];
+      if (!cur) return { status: "error", message: "Event not found." };
+      _uevSheet().deleteRow(cur.row);
+      logAction(admin, "deleteUpcomingEvent", evId + " | " + cur.title);
+      _uevBust();
+      return { status: "success" };
+    } finally { lock.releaseLock(); }
+  } catch (err) { return { status: "error", message: err.message }; }
+}
+function _uevSetMaster(e) {
+  try {
+    const on = String(e.parameter.On || "").toLowerCase() !== "no";
+    const admin = sanitize(e.parameter.AdminName || "Admin", 100) || "Admin";
+    const props = PropertiesService.getScriptProperties();
+    if (on) props.deleteProperty("UEV_MASTER"); else props.setProperty("UEV_MASTER", "off");
+    logAction(admin, "setUpcomingMaster", on ? "Upcoming event tag ON" : "Upcoming event tag OFF (hidden everywhere)");
+    _uevBust();
+    return { status: "success", master: on };
+  } catch (err) { return { status: "error", message: err.message }; }
+}
+
+// ── Tag builders used by the receipt / summary emails and the summary PDF ──
+function _uevLineHtml(e) {
+  return "<strong>" + _htmlEscape(e.title) + "</strong> &middot; " + _htmlEscape(e.dateText) + (e.note ? " &middot; " + _htmlEscape(e.note) : "");
+}
+// Table row for the receipt-style emails (same width/padding as the other rows)
+function _uevEmailRow(ev) {
+  ev = ev || _uevGetActive();
+  if (!ev.length) return "";
+  return '<tr><td style="padding:0 32px 18px;">' + _uevEmailBox(ev, "0") + '</td></tr>';
+}
+// Stand-alone box (admin summary email)
+function _uevEmailBox(ev, margin) {
+  ev = ev || _uevGetActive();
+  if (!ev.length) return "";
+  return '<div style="margin:' + (margin === undefined ? "14px 0 0" : margin) + ';padding:10px 14px;border:1px solid #F0D58A;border-radius:10px;background:#FFF4D6;text-align:left;" bgcolor="#FFF4D6">' +
+    '<div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#92400E;margin:0 0 4px;">&#129684; Upcoming event' + (ev.length > 1 ? "s" : "") + '</div>' +
+    ev.map(function (e) { return '<div style="font-size:13px;line-height:1.6;color:#7A4B00;">' + _uevLineHtml(e) + '</div>'; }).join("") +
+    '</div>';
+}
+// Height (px) the PDF strip needs - the summary uses it in its one-page fit
+function _uevPdfHeight(n, compact) {
+  if (!n) return 0;
+  return (compact ? 10 : 14) + 2 + (compact ? 12 : 14) * (1 + n) + (compact ? 8 : 10);
+}
+function _uevPdfStrip(ev, fillFn, compact) {
+  if (!ev || !ev.length) return "";
+  const fs = compact ? 10 : 11.5, lh = compact ? 12 : 14;
+  return "<div style='margin-top:" + (compact ? 8 : 10) + "px;padding:" + (compact ? "5px 12px" : "7px 14px") + ";border:1px solid #F0D58A;border-radius:8px;" + fillFn("#FFF4D6") + "color:#7A4B00;font-size:" + fs + "px;line-height:" + lh + "px;'>" +
+    "<div style='font-size:" + (fs - 2) + "px;font-weight:700;letter-spacing:1px;color:#92400E;'>UPCOMING EVENT" + (ev.length > 1 ? "S" : "") + "</div>" +
+    ev.map(function (e) { return "<div style='white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>" + _uevLineHtml(e) + "</div>"; }).join("") +
+    "</div>";
 }
 
 // ── Announcement helpers (extracted for clarity)

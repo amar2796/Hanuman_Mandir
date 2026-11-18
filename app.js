@@ -1620,7 +1620,65 @@ async function sendReceiptEmailDirect(rid){
 
 /* Legacy alias kept for backward compatibility */
 /* printReceipt — opens print dialog for the receipt modal */
-function printReceipt(rid){
+/* ═══ UPCOMING EVENT TAG ═══
+   Small "Upcoming event" strip on receipts (print view + PDF). Events come from the
+   server (getUpcomingEvents, cached 5 min on this device). Any problem = no strip:
+   a receipt must never fail because of this. Admin page calls UEV.clear() after edits. */
+window.UEV=(function(){
+  var KEY="uev_cache_v1",TTL=5*60*1000,inflight=null;
+  function todayIso(){try{return new Date().toLocaleDateString("en-CA");}catch(e){return "";}}
+  function live(list){var t=todayIso();return (Array.isArray(list)?list:[]).filter(function(e){return e&&e.title&&(!e.date||!t||e.date>=t);}).slice(0,2);}
+  function read(){try{var o=JSON.parse(sessionStorage.getItem(KEY)||"null");if(o&&Date.now()-o.t<TTL)return o.v;}catch(e){}return null;}
+  function write(v){try{sessionStorage.setItem(KEY,JSON.stringify({t:Date.now(),v:v}));}catch(e){}}
+  function clear(){try{sessionStorage.removeItem(KEY);}catch(e){}inflight=null;}
+  function get(){
+    var c=read();if(c)return Promise.resolve(live(c));
+    if(inflight)return inflight;
+    var guard=new Promise(function(_,rej){setTimeout(function(){rej(new Error("timeout"));},4500);});
+    inflight=Promise.race([getData("getUpcomingEvents"),guard]).then(function(r){
+      inflight=null;
+      if(r&&r.status==="success"&&Array.isArray(r.events)){write(r.events);return live(r.events);}
+      return [];
+    }).catch(function(){inflight=null;return [];});
+    return inflight;
+  }
+  function line(e){return e.title+" \u00B7 "+(e.dateText||e.date||"")+(e.note?" \u00B7 "+e.note:"");}
+  function printHtml(list){
+    list=live(list);if(!list.length)return "";
+    return '<div class="uev"><div class="uev-h">UPCOMING EVENT'+(list.length>1?"S":"")+'</div>'+
+      list.map(function(e){return '<div class="uev-l"><b>'+escapeHtml(e.title)+'</b> \u00B7 '+escapeHtml(e.dateText||e.date||"")+(e.note?' \u00B7 '+escapeHtml(e.note):'')+'</div>';}).join("")+'</div>';
+  }
+  /* Drawn on a canvas (not jsPDF text) so Hindi / any script prints correctly. Returns {url,h(mm)} for a 210mm-wide band. */
+  function pdfStrip(list){
+    try{
+      list=live(list);if(!list.length)return null;
+      var PX=6,W=210*PX,padY=3*PX,labH=4.2*PX,lineH=5.2*PX,H=Math.round(padY*2+labH+list.length*lineH);
+      var cv=document.createElement("canvas");cv.width=W;cv.height=H;
+      var x=cv.getContext("2d");
+      x.fillStyle="#FFF4D6";x.fillRect(0,0,W,H);
+      x.fillStyle="#F0D58A";x.fillRect(0,0,W,2);x.fillRect(0,H-2,W,2);
+      var FF="'Noto Sans Devanagari','Nirmala UI','Mangal',Arial,Helvetica,sans-serif";
+      x.textBaseline="middle";x.textAlign="left";
+      x.fillStyle="#92400E";x.font="bold "+Math.round(2.3*PX)+"px "+FF;
+      var lab="UPCOMING EVENT"+(list.length>1?"S":"");
+      x.fillText(lab,(W-x.measureText(lab).width)/2,padY+labH/2);
+      var fpx=Math.round(3.3*PX),maxW=W-20*PX;
+      list.forEach(function(e,i){
+        var t=e.title,rest=" \u00B7 "+(e.dateText||e.date||"")+(e.note?" \u00B7 "+e.note:"");
+        x.font="bold "+fpx+"px "+FF;var tw=x.measureText(t).width;
+        x.font=fpx+"px "+FF;
+        while(rest.length>4&&tw+x.measureText(rest).width>maxW)rest=rest.slice(0,-2).replace(/\s+$/,"")+"\u2026";
+        var rw=x.measureText(rest).width,sx=Math.max(10*PX,(W-tw-rw)/2),cy=padY+labH+i*lineH+lineH/2;
+        x.fillStyle="#7A4B00";x.font="bold "+fpx+"px "+FF;x.fillText(t,sx,cy);
+        x.font=fpx+"px "+FF;x.fillText(rest,sx+tw,cy);
+      });
+      return {url:cv.toDataURL("image/png"),h:H/PX};
+    }catch(e){return null;}
+  }
+  return {get:get,clear:clear,line:line,printHtml:printHtml,pdfStrip:pdfStrip,live:live};
+})();
+
+async function printReceipt(rid){
   const stored = window._rcptStore[rid];
   if(!stored){toast("Receipt data not found.","error");return;}
   const {c,userName,typeName,occasionName} = stored;
@@ -1630,6 +1688,7 @@ function printReceipt(rid){
     ? `<img src="${window._logoB64}" alt="Logo" style="width:60px;height:60px;border-radius:50%;border:3px solid rgba(193, 68, 14,0.7);object-fit:cover;display:block;margin:0 auto 10px;">`
     : `<div class="om">${APP.symbol}</div>`;
   const win = window.open("","_blank","width=620,height=800");
+  let _uevHtml=""; try{ _uevHtml=UEV.printHtml(await UEV.get()); }catch(e){}
   win.document.write(`<!DOCTYPE html><html><head><title>Receipt ${displayRID}</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap');
@@ -1657,6 +1716,8 @@ function printReceipt(rid){
     .sig{display:flex;justify-content:space-between;padding:14px 16px;border-top:1px solid #e2e8f0;font-size:11px;background:#f8fafc;}
     .footer{background:linear-gradient(135deg,#FDF0E6,#fef3c7);padding:14px 20px;text-align:center;border-top:2px solid #F3C6A8;font-size:12.5px;color:#C1440E;font-weight:700;}
     .footer-sub{font-size:11px;color:#64748b;margin-top:3px;font-style:italic;font-weight:400;}
+    .uev{background:#FFF4D6;border-top:1px solid #F0D58A;border-bottom:1px solid #F0D58A;padding:10px 20px;text-align:center;color:#7A4B00;font-size:12.5px;line-height:1.6;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+    .uev-h{font-size:10px;font-weight:700;letter-spacing:1.2px;color:#92400E;margin-bottom:2px;}
     @media print{body{padding:0;background:#fff;}.card{box-shadow:none;border-radius:0;}}
   </style></head><body>
   <div class="card">
@@ -1684,6 +1745,7 @@ function printReceipt(rid){
     <div><strong style="color:#334155;">${escapeHtml(APP.signatory)}</strong><br/><span style="color:#64748b;">${escapeHtml(APP.designation)}</span><br/><span style="color:#94a3b8;font-size:10px;">${escapeHtml(APP.name)}</span></div>
     <div style="text-align:right;color:#94a3b8;font-size:10px;">System-generated receipt<br/>No signature required</div>
   </div>
+  ${_uevHtml}
   <div class="footer">🙏 ${escapeHtml(APP.thankYouMsg)}<div class="footer-sub">${escapeHtml(APP.tagline)}</div></div>
   </div>
   <script>setTimeout(function(){window.print();},300);<\/script></body></html>`);
@@ -1727,6 +1789,9 @@ async function exportReceiptPDF(rid){
   /* Pre-generate QR before any drawing */
   let _qrDataUrl = null;
   try { _qrDataUrl = await _generateQRDataUrl(qrText, 200); } catch(e){}
+  /* Upcoming-event strip (optional, never blocks the receipt) */
+  let _uevImg = null;
+  try { _uevImg = UEV.pdfStrip(await UEV.get()); } catch(e){}
 
   const doc = new jsPDF({format:"a4", unit:"mm"});
   const W   = doc.internal.pageSize.getWidth();   /* 210mm */
@@ -1865,6 +1930,11 @@ async function exportReceiptPDF(rid){
   doc.text("System-generated receipt",W-10,Y+7,{align:"right"});
   doc.text("No signature required",W-10,Y+12,{align:"right"});
   Y+=SIG_H;
+
+  /* 6b. UPCOMING EVENT STRIP (only when an event is enabled and there is room) */
+  if(_uevImg && Y + _uevImg.h + 20 + 3 <= 297){
+    try{ doc.addImage(_uevImg.url,"PNG",0,Y,210,_uevImg.h); Y += _uevImg.h; }catch(e){}
+  }
 
   /* 7. THANK YOU FOOTER */
   const FTR_H=20;

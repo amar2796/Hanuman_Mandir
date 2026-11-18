@@ -1,0 +1,63 @@
+      <div id="upcomingEventPage" class="page">
+        <div class="card-v2">
+          <h3><i class="fa-solid fa-calendar-day" style="color:#C1440E;"></i> Upcoming Event Tag</h3>
+          <p style="color:#666;font-size:14px;margin-bottom:18px;">
+            Add events like Bal Bhoj or Bhandara. The nearest 2 enabled events are printed as a small tag on receipts
+            (PDF, print, email), the member monthly email and the admin monthly summary (PDF, image, email).
+            An event hides itself after its date.
+          </p>
+
+          <label style="display:flex;align-items:center;gap:10px;padding:12px 14px;border:1.5px solid #F3C6A8;background:#FDF0E6;border-radius:10px;margin-bottom:20px;cursor:pointer;font-size:14px;font-weight:600;color:#7A1F1F;">
+            <input type="checkbox" id="uev_master" onchange="uevMaster(this)" style="width:18px;height:18px;accent-color:#C1440E;">
+            Show upcoming events everywhere
+            <span id="uev_master_note" style="font-weight:400;font-size:12px;color:#888;margin-left:auto;"></span>
+          </label>
+
+          <div id="uev_form_box" style="background:#fff;border:1.5px solid #eee;border-radius:12px;padding:16px;margin-bottom:20px;">
+            <div id="uev_form_title" style="font-size:13px;font-weight:700;color:#555;margin-bottom:10px;">Add an event</div>
+            <input type="hidden" id="uev_id" value="">
+            <div style="display:grid;grid-template-columns:2fr 1fr;gap:12px;margin-bottom:10px;">
+              <div>
+                <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px;">Event name</label>
+                <input id="uev_title" maxlength="80" placeholder="e.g. Bal Bhoj" oninput="uevPreview()"
+                  style="width:100%;padding:9px 12px;border:1.5px solid #ddd;border-radius:8px;font-family:Poppins,sans-serif;font-size:13px;outline:none;box-sizing:border-box;"
+                  onfocus="this.style.borderColor='#C1440E'" onblur="this.style.borderColor='#ddd'">
+              </div>
+              <div>
+                <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px;">Date</label>
+                <input id="uev_date" type="date" oninput="uevPreview()"
+                  style="width:100%;padding:8px 10px;border:1.5px solid #ddd;border-radius:8px;font-family:Poppins,sans-serif;font-size:13px;outline:none;box-sizing:border-box;"
+                  onfocus="this.style.borderColor='#C1440E'" onblur="this.style.borderColor='#ddd'">
+              </div>
+            </div>
+            <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px;">Note <span style="color:#aaa;font-weight:400;">(optional - time, place)</span></label>
+            <input id="uev_note" maxlength="120" placeholder="e.g. Mandir Prangan, 1 PM" oninput="uevPreview()"
+              style="width:100%;padding:9px 12px;border:1.5px solid #ddd;border-radius:8px;font-family:Poppins,sans-serif;font-size:13px;outline:none;box-sizing:border-box;margin-bottom:10px;"
+              onfocus="this.style.borderColor='#C1440E'" onblur="this.style.borderColor='#ddd'">
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;">
+              <span style="font-size:12px;color:#888;align-self:center;">Quick pick:</span>
+              <button type="button" onclick="uevChip('Bal Bhoj')" style="background:#f6f0ea;color:#7A1F1F;border:none;padding:5px 12px;border-radius:14px;font-size:12px;cursor:pointer;box-shadow:none;">Bal Bhoj</button>
+              <button type="button" onclick="uevChip('Bhandara')" style="background:#f6f0ea;color:#7A1F1F;border:none;padding:5px 12px;border-radius:14px;font-size:12px;cursor:pointer;box-shadow:none;">Bhandara</button>
+              <button type="button" onclick="uevChip('Jagran')" style="background:#f6f0ea;color:#7A1F1F;border:none;padding:5px 12px;border-radius:14px;font-size:12px;cursor:pointer;box-shadow:none;">Jagran</button>
+              <button type="button" onclick="uevChip('Puja')" style="background:#f6f0ea;color:#7A1F1F;border:none;padding:5px 12px;border-radius:14px;font-size:12px;cursor:pointer;box-shadow:none;">Puja</button>
+            </div>
+            <div id="uev_preview_wrap" style="display:none;margin-bottom:12px;">
+              <div style="font-size:12px;font-weight:600;color:#888;margin-bottom:6px;">Live preview (as printed)</div>
+              <div id="uev_preview" style="background:#FFF4D6;border:1px solid #F0D58A;border-radius:10px;padding:10px 14px;color:#7A4B00;font-size:13px;line-height:1.6;"></div>
+            </div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;">
+              <button id="uev_save_btn" type="button" onclick="uevSave()"
+                style="background:linear-gradient(135deg,#C1440E,#d35400);color:#fff;border:none;padding:10px 24px;border-radius:8px;font-weight:600;font-size:14px;cursor:pointer;">
+                <i class="fa-solid fa-plus"></i>&nbsp; Add event
+              </button>
+              <button id="uev_cancel_btn" type="button" onclick="uevCancel()" style="display:none;background:#f0f0f0;color:#555;border:none;padding:10px 20px;border-radius:8px;font-weight:600;font-size:14px;cursor:pointer;box-shadow:none;">Cancel edit</button>
+            </div>
+          </div>
+
+          <h4 style="color:#946c44;font-size:14px;margin-bottom:12px;">Saved events</h4>
+          <div id="uev_list">
+            <p style="color:#aaa;font-size:13px;"><i class="fa-solid fa-spinner fa-spin"></i> Loading...</p>
+          </div>
+        </div>
+      </div>
+

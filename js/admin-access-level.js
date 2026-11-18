@@ -76,6 +76,7 @@
     addGoal: "super", updateGoal: "super", deleteGoal: "super", addEvent: "super", updateEvent: "super", deleteEvent: "super", addEventExpense: "super",
     deleteGalleryPhoto: "super", uploadGalleryPhoto: "super",
     saveEmailSettings: "super", saveAnnouncement: "super", clearAnnouncement: "super", toggleAnnouncementStatus: "super",
+    saveUpcomingEvent: "admin", toggleUpcomingEvent: "admin", setUpcomingMaster: "admin", deleteUpcomingEvent: "super",
     saveBroadcast: "super", deleteBroadcast: "super", toggleBroadcast: "super", saveChatbotConfig: "super",
     deleteFeedback: "super", deleteContributionRequest: "super",
     triggerMonthlyReport: "super", triggerMonthlyReminder: "super", sendMonthlyReminders: "super", sendBirthdayEmails: "super",
