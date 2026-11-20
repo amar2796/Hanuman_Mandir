@@ -37,6 +37,11 @@
         var monthlyOn  = s === true || (s && s.monthly_report  === true);
         var birthdayOn = s && s.birthday_email === true;
         var adminSummaryOn = s && s.admin_monthly_summary === true;
+        var thankyouOn = s && s.thankyou_card === true;
+        var tThankyou = document.getElementById("toggle_thankyou_card");
+        if (tThankyou) { tThankyou.checked = thankyouOn; tThankyou.disabled = false; }
+        _updateToggleStatus("thankyou_card", thankyouOn);
+        _updateCardStyle("ea_card_thankyou", thankyouOn);
         var tReceipt  = document.getElementById("toggle_auto_receipt");
         var tMonthly  = document.getElementById("toggle_monthly_report");
         var tBirthday = document.getElementById("toggle_birthday_email");
@@ -62,7 +67,7 @@
         }
       }).catch(function () {
         // Fetch failed — show OFF state, re-enable toggles
-        ["toggle_auto_receipt", "toggle_monthly_report", "toggle_birthday_email", "toggle_admin_monthly_summary"].forEach(function (id) {
+        ["toggle_auto_receipt", "toggle_monthly_report", "toggle_birthday_email", "toggle_admin_monthly_summary", "toggle_thankyou_card"].forEach(function (id) {
           var el = document.getElementById(id);
           if (el) { el.checked = false; el.disabled = false; }
         });
@@ -121,16 +126,20 @@
         "auto_receipt":   "ea_receipt_status",
         "monthly_report": "ea_monthly_status",
         "birthday_email": "ea_birthday_status",
-        "admin_monthly_summary": "ea_admin_summary_status"
+        "admin_monthly_summary": "ea_admin_summary_status",
+        "thankyou_card": "ea_thankyou_status"
       };
       var el = document.getElementById(statusMap[key]);
       if (!el) return;
       var dot = isOn
         ? "<span style='display:inline-block;width:10px;height:10px;border-radius:50%;background:#10b981;margin-right:5px;vertical-align:middle;'></span>"
         : "<span style='display:inline-block;width:10px;height:10px;border-radius:50%;background:#94a3b8;margin-right:5px;vertical-align:middle;'></span>";
-      var label = isOn
+      var label = key === "thankyou_card"
+        ? (isOn ? "<strong style='color:#059669;'>Active</strong> — new receipt emails include the card (sent about a minute later)"
+                : "<strong style='color:#94a3b8;'>Inactive</strong> — receipts go out without a card")
+        : (isOn
         ? "<strong style='color:#059669;'>Active</strong> — emails will be sent automatically"
-        : "<strong style='color:#94a3b8;'>Inactive</strong> — no automatic emails";
+        : "<strong style='color:#94a3b8;'>Inactive</strong> — no automatic emails");
       el.innerHTML = dot + label;
     }
 
@@ -143,8 +152,8 @@
 
     function saveEmailToggle(key, value) {
       // Show saving indicator
-      var cardMap = { "auto_receipt": "ea_card_receipt", "monthly_report": "ea_card_monthly", "birthday_email": "ea_card_birthday", "admin_monthly_summary": "ea_card_admin_summary" };
-      var labelMap = { "auto_receipt": "Auto Receipt Email", "monthly_report": "Monthly Report", "birthday_email": "Birthday Email", "admin_monthly_summary": "Admin Monthly Summary" };
+      var cardMap = { "auto_receipt": "ea_card_receipt", "monthly_report": "ea_card_monthly", "birthday_email": "ea_card_birthday", "admin_monthly_summary": "ea_card_admin_summary", "thankyou_card": "ea_card_thankyou" };
+      var labelMap = { "auto_receipt": "Auto Receipt Email", "monthly_report": "Monthly Report", "birthday_email": "Birthday Email", "admin_monthly_summary": "Admin Monthly Summary", "thankyou_card": "Thank-you Card" };
       const cardId = cardMap[key] || "ea_card_receipt";
       const card = document.getElementById(cardId);
       if (card) card.style.opacity = "0.6";
@@ -175,6 +184,7 @@
     }
 
     function initEmailAutoPage() {
+      if (typeof loadThankYouCardAdmin === "function") loadThankYouCardAdmin();   // card look, preview and "running now"
       // Populate month/year dropdowns for manual send
       const now = new Date();
       const mSel = document.getElementById("ea_test_month");

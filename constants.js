@@ -181,6 +181,32 @@
          Leave blank ("") to hide the map iframe entirely. */
       mapEmbedUrl: "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3273.497389457402!2d82.20519597492734!3d26.321060585267084!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x399a790bd4e8dff3%3A0x93c61c2049ae55f2!2sHanuman%20Mandir!5e1!3m2!1sen!2sin!4v1775203315104!5m2!1sen!2sin",
     
+      /* ── THANK-YOU CARD (WhatsApp-status image sent with receipt emails) ──
+         The card is built on the SERVER, so the live values are CFG.card in
+         appscript.txt. This copy is kept here so every mandir detail sits in
+         one place — ✔ SYNC these with CFG.card when you change them.
+         Switch it on/off: Admin → Email Automation → "Thank-you card".
+         A blank value hides that line. NOTE: contact is PUBLIC — anyone who
+         sees a shared status can see it.
+           theme  : sindoor | maroon | night | cream
+           border : gold | line | none
+           amount : off (never show) | on (always) | both (two images) */
+      card: {
+        theme:        "sindoor",
+        border:       "gold",
+        amount:       "off",
+        nameSuffix:   " ji",
+        blessing:     "May Hanuman ji bless you and your family",
+        joinTitle:    "JOIN US, ALL ARE WELCOME",
+        joinLine:     "Come with your family and friends",
+        mapLink:      "https://maps.app.goo.gl/EoBhP8bxWjs2Mk5V9",
+        aarti:        "6:00 AM · 7:00 PM",
+        contactLabel: "TO JOIN SEVA",
+        contact:      "+91 98198 41147",
+        footer:       "Shared from the Shree Hanuman Mandir app"
+      },
+
+
       /* ── GOOGLE DRIVE FOLDER IDs ───────────────────────────────────────
          IDs of Drive folders where uploaded files are stored.
          Create sub-folders in your Drive, paste the folder IDs here.

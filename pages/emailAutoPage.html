@@ -46,6 +46,26 @@
               </div>
             </div>
 
+            <!-- Toggle: Thank-you card (WhatsApp status image in the receipt email) -->
+            <div style="border:1.5px solid #e2e8f0;border-radius:12px;padding:18px;background:#fff;transition:border-color 0.2s;" id="ea_card_thankyou">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">
+                <div style="flex:1;">
+                  <div style="font-weight:700;color:#1e293b;font-size:14px;margin-bottom:4px;">
+                    <i class="fa-solid fa-image" style="color:#C1440E;margin-right:6px;"></i>Thank-you Card
+                  </div>
+                  <div style="font-size:11.5px;color:#64748b;line-height:1.6;">Adds a shareable WhatsApp-status card to each receipt email (name, upcoming events, mandir location). Members can save it and post it. The receipt then arrives about a minute after it is added. If the card cannot be made, the normal receipt is sent. Look and wording: <code>CFG.card</code>.</div>
+                </div>
+                <label class="ea-toggle" style="flex-shrink:0;">
+                  <input type="checkbox" id="toggle_thankyou_card"
+                    onchange="saveEmailToggle('thankyou_card', this.checked)">
+                  <span class="ea-slider"></span>
+                </label>
+              </div>
+              <div style="margin-top:12px;padding-top:10px;border-top:1px solid #f1f5f9;font-size:11px;color:#94a3b8;" id="ea_thankyou_status">
+                <i class="fa-solid fa-circle" style="font-size:7px;margin-right:4px;color:#94a3b8;"></i> Loading status...
+              </div>
+            </div>
+
             <!-- Toggle 2: Monthly End-of-Month Report -->
             <div
               style="border:1.5px solid #e2e8f0;border-radius:12px;padding:18px;background:#fff;transition:border-color 0.2s;"
@@ -119,6 +139,19 @@
                 status...
               </div>
             </div>
+          </div>
+
+          <!-- Thank-you card look: theme / border / amount / sections, live preview, test email -->
+          <style>
+            #tyc_grid { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,400px); gap:22px; align-items:start; }
+            @media (max-width:900px) { #tyc_grid { grid-template-columns:minmax(0,1fr); } }
+          </style>
+          <div id="tyc_box" style="margin-bottom:24px;background:#fff;border:1.5px solid #e2e8f0;border-radius:12px;padding:18px;">
+            <div style="font-weight:700;color:#1e293b;font-size:14px;margin-bottom:4px;">
+              <i class="fa-solid fa-palette" style="color:#C1440E;margin-right:6px;"></i>Thank-you Card Look
+            </div>
+            <div style="font-size:11.5px;color:#64748b;line-height:1.6;margin-bottom:14px;">Choose the colour, border and what the card shows. The banner always shows which look is running now. Changes apply to the next cards made; emails already sent do not change.</div>
+            <div id="tyc_body"><p style="color:#94a3b8;font-size:13px;"><i class="fa-solid fa-spinner fa-spin"></i> Loading...</p></div>
           </div>
 
           <!-- Email Logo — auto-loaded from Drive folder set in CFG.folderLogo -->

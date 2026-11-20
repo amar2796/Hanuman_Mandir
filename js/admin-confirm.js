@@ -188,7 +188,7 @@
 
   /* Functions that are also reached without a click (Enter key, change events) are guarded
      by wrapping the function itself. */
-  var TOGGLES = { auto_receipt: "automatic receipt emails", monthly_report: "the monthly report email", birthday_email: "birthday emails", admin_monthly_summary: "the admin monthly summary" };
+  var TOGGLES = { auto_receipt: "automatic receipt emails", monthly_report: "the monthly report email", birthday_email: "birthday emails", admin_monthly_summary: "the admin monthly summary", thankyou_card: "the thank-you card in receipt emails" };
   function wrapFns() {
     var wish = window._sendAdminBirthdayWish;
     if (typeof wish === "function" && !wish._gcm) {
